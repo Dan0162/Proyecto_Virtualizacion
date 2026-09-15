@@ -11,8 +11,7 @@ services:
       POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # Área 4 (Datos) coloca aquí sus scripts .sql de creación de BD/usuarios/seeds.
-      # Se ejecutan automáticamente solo la primera vez que se crea el volumen.
+      # Área 4 (Datos) coloca aquí sus scripts .sql 
       - ./db/init:/docker-entrypoint-initdb.d:ro
     networks:
       - internal
