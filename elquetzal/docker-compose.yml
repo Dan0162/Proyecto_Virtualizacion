@@ -9,10 +9,15 @@ services:
     environment:
       POSTGRES_USER: ${PG_SUPERUSER}
       POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
+      CATALOGO_DB_PASSWORD: ${CATALOGO_DB_PASSWORD}
+      INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD}
+      CLIENTES_DB_PASSWORD: ${CLIENTES_DB_PASSWORD}
+      PEDIDOS_DB_PASSWORD: ${PEDIDOS_DB_PASSWORD}
+      REPORTES_DB_PASSWORD: ${REPORTES_DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # Área 4 (Datos) coloca aquí sus scripts .sql 
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+      # Área 4 (Datos) coloca aquí sus scripts .sql
+      - ./bd/init:/docker-entrypoint-initdb.d:ro
     networks:
       - internal
     healthcheck:
@@ -113,7 +118,6 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - frontend
       - catalogo
       - inventario
       - clientes

@@ -1,0 +1,13 @@
+-- Área 4 (Datos) — reportes_db (microservicio "reportes").
+--
+-- El rol y la base ya se crean en 00-databases.sh. No se define esquema aquí
+-- a propósito: el enunciado dice que Backend de dominio (Área 5) resuelve
+-- la lógica de reportes por cuenta propia (agregando datos de catalogo,
+-- inventario y pedidos vía sus APIs). Si esa lógica necesita persistir algo
+-- propio (p. ej. una tabla de caché de métricas), créenla aquí como
+-- reportes_user:
+--
+--   \connect reportes_db
+--   SET ROLE reportes_user;
+--   CREATE TABLE ...;
+--   RESET ROLE;
