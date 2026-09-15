@@ -1,0 +1,131 @@
+name: elquetzal
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: elquetzal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_SUPERUSER}
+      POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Área 4 (Datos) coloca aquí sus scripts .sql de creación de BD/usuarios/seeds.
+      # Se ejecutan automáticamente solo la primera vez que se crea el volumen.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_SUPERUSER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  catalogo:
+    build:
+      context: ./services/catalogo
+    image: ${DOCKERHUB_USER}/elquetzal-catalogo:${TAG:-latest}
+    container_name: elquetzal-catalogo
+    restart: unless-stopped
+    env_file:
+      - ./services/catalogo/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  inventario:
+    build:
+      context: ./services/inventario
+    image: ${DOCKERHUB_USER}/elquetzal-inventario:${TAG:-latest}
+    container_name: elquetzal-inventario
+    restart: unless-stopped
+    env_file:
+      - ./services/inventario/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  clientes:
+    build:
+      context: ./services/clientes
+    image: ${DOCKERHUB_USER}/elquetzal-clientes:${TAG:-latest}
+    container_name: elquetzal-clientes
+    restart: unless-stopped
+    env_file:
+      - ./services/clientes/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  pedidos:
+    build:
+      context: ./services/pedidos
+    image: ${DOCKERHUB_USER}/elquetzal-pedidos:${TAG:-latest}
+    container_name: elquetzal-pedidos
+    restart: unless-stopped
+    env_file:
+      - ./services/pedidos/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      inventario:
+        condition: service_started
+      catalogo:
+        condition: service_started
+    networks:
+      - internal
+
+  reportes:
+    build:
+      context: ./services/reportes
+    image: ${DOCKERHUB_USER}/elquetzal-reportes:${TAG:-latest}
+    container_name: elquetzal-reportes
+    restart: unless-stopped
+    env_file:
+      - ./services/reportes/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ./frontend
+    image: ${DOCKERHUB_USER}/elquetzal-frontend:${TAG:-latest}
+    container_name: elquetzal-frontend
+    restart: unless-stopped
+    networks:
+      - internal
+
+  gateway:
+    build:
+      context: ./gateway
+    image: ${DOCKERHUB_USER}/elquetzal-gateway:${TAG:-latest}
+    container_name: elquetzal-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - catalogo
+      - inventario
+      - clientes
+      - pedidos
+      - reportes
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  db_data:
