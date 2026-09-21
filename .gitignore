@@ -2,3 +2,4 @@
 .env
 elquetzal/.env
 elquetzal/services/*/.env
+elquetzal/services/*/__pycache__/
