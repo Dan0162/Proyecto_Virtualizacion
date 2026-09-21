@@ -1,0 +1,7 @@
+{
+  "name": "frontend-dummy",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "mkdir -p dist && echo '<html><body>Backend Only Mode</body></html>' > dist/index.html"
+  }
+}
