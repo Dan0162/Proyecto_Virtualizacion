@@ -327,7 +327,7 @@ async function guardar() {
 
 async function eliminar(producto) {
   const confirmado = confirm(
-    ¿Eliminar "${producto.nombre}"? Esta acción no se puede deshacer.
+    `¿Eliminar "${producto.nombre}"? Esta acción no se puede deshacer.`
   );
 
   if (!confirmado) {
