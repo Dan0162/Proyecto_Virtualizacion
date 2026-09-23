@@ -341,7 +341,7 @@ async function eliminar(producto) {
     await cargar();
   } catch (e) {
     error.value =
-      No se pudo eliminar: ${e.message};
+      `No se pudo eliminar: ${e.message}`;
   }
 }
 
