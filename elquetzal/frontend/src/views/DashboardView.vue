@@ -105,7 +105,7 @@
 
       stockBajo.value = data.alertas_stock_bajo ?? [];
     } catch (e) {
-      error.value = 'No se pudo cargar el dashboard: ${e.message}'; 
+      error.value = `No se pudo cargar el dashboard: ${e.message}`; 
     } finally {
       cargando.value = false;
     }
