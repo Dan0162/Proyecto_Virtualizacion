@@ -231,7 +231,7 @@ async function cargar() {
     });
   } catch (e) {
     error.value =
-      No se pudo cargar el inventario: ${e.message};
+      `No se pudo cargar el inventario: ${e.message}`;
   } finally {
     cargando.value = false;
   }
