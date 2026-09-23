@@ -1,5 +1,8 @@
+import json
 import math
 import os
+import urllib.request
+from urllib.error import HTTPError
 from decimal import Decimal, InvalidOperation
 
 import psycopg
@@ -229,6 +232,34 @@ def crear_pedido():
     if error:
         return jsonify(error=error), 422
 
+    inventario_url = os.getenv("INVENTARIO_URL", "http://inventario:5000")
+    
+    # 1. Verificar stock
+    stock_actualizado = {}
+    for detalle in campos["detalles"]:
+        sku = detalle["sku"]
+        cantidad_requerida = detalle["cantidad"]
+        
+        try:
+            req = urllib.request.Request(f"{inventario_url}/stock/{sku}")
+            with urllib.request.urlopen(req) as response:
+                data = json.loads(response.read().decode())
+                stock = data.get("stock", {})
+                
+                # Si el SKU ya se proceso en este pedido, usamos el stock restado, si no, el de la BD
+                cantidad_disponible = stock_actualizado.get(sku, stock.get("cantidad", 0))
+                
+                if cantidad_disponible < cantidad_requerida:
+                    return jsonify(error=f"Stock insuficiente para el SKU: {sku}"), 400
+                    
+                stock_actualizado[sku] = cantidad_disponible - cantidad_requerida
+        except HTTPError as e:
+            if e.code == 404:
+                return jsonify(error=f"Stock no encontrado para el SKU: {sku}"), 400
+            return jsonify(error=f"Error al consultar el stock del SKU: {sku}"), 500
+        except Exception as e:
+            return jsonify(error=f"Error de conexion con inventario: {str(e)}"), 500
+
     try:
         with connect_db() as conn:
             with conn.cursor() as cur:
@@ -249,6 +280,20 @@ def crear_pedido():
                     """, (pedido[0], detalle["sku"], detalle["cantidad"],
                           detalle["precio_unitario_q"]))
                     detalles.append(cur.fetchone())
+
+        # Descontar stock tras exito en BD
+        for sku, nueva_cantidad in stock_actualizado.items():
+            try:
+                req = urllib.request.Request(
+                    f"{inventario_url}/stock/{sku}",
+                    data=json.dumps({"cantidad": nueva_cantidad}).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="PUT"
+                )
+                with urllib.request.urlopen(req) as response:
+                    pass
+            except Exception as e:
+                print(f"Error descontando stock para {sku}: {e}")
 
         respuesta = {
             "id": pedido[0],
