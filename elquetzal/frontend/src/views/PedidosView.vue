@@ -392,7 +392,7 @@ onMounted(() => {
 
 .layout {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   align-items: start;
 }
@@ -432,9 +432,9 @@ onMounted(() => {
   min-width: 0;
 }
 
-@media (max-width: 900px) {
+/* @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
   }
-}
+} */
 </style>

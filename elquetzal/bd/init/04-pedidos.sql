@@ -57,3 +57,7 @@ INSERT INTO detalle_pedido (pedido_id, sku, cantidad, precio_unitario_q) VALUES
     (5, 'QT-0007', 4, 30.00);
 
 RESET ROLE;
+
+-- Lectura para el dashboard de "reportes" (Área 5): solo cuenta pedidos del
+-- día, no necesita integrantes ni detalle_pedido. Sin INSERT/UPDATE/DELETE.
+GRANT SELECT ON pedidos TO reportes_user;

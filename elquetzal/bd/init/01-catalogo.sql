@@ -25,3 +25,6 @@ INSERT INTO productos (sku, nombre, categoria, precio_q) VALUES
     ('QT-0008', 'Frijol negro 5lb',        'Abarrotes', 34.50);
 
 RESET ROLE;
+
+-- Lectura para el dashboard de "reportes" (Área 5). Sin INSERT/UPDATE/DELETE.
+GRANT SELECT ON productos TO reportes_user;
