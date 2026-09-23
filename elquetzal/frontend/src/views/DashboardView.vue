@@ -1,117 +1,142 @@
-<template> 
+<template>
   <div>
-    
     <header class="view-header">
-      <h1> Dashboard </h1>
-      <p class="subtitle"> Estado general del inventario y pedidos </p>
+      <h1>Dashboard</h1>
+      <p class="subtitle">Estado general del inventario y pedidos</p>
     </header>
-    
+
     <div v-if="cargando" class="empty-state">
-      Cargando Métricas...
+      Cargando métricas…
     </div>
-    
-    <div v-if="error" class="error-state">
-      {{error}}
+
+    <div v-else-if="error" class="error-state">
+      {{ error }}
     </div>
 
     <template v-else>
-        <div class="metric-grid">
-          <div class="card metric">
-            <span class="metric-label"> Productos totales </span>
-            <span class="metric-value mono"> {{resumen.total_productos}} </span> 
-          </div>
-          
-          <div class="card metric">
-            <span class="metric-label"> Valor del inventario </span>
-            <span class="metric-value mono"> {{formatQ(resumen.valor_total_inventario_q)}} </span> 
-          </div>
-
-          <div class="card metric">
-            <span class="metric-label"> Pedidos de hoy </span>
-            <span class="metric-value mono"> {{resumen.pedidos_del_dia}} </span> 
-          </div>
-
-          <div class="card metric":class="{alerta:stockBajo.length}">
-            <span class="metric-label"> Productos con stock bajo </span>
-            <span class="metric-value mono"> {{stockBajo.length}} </span>
-          </div>
-        </div>
-        
-        <div v-if="stockBajo.length" class="card stock-list">
-          <h2> Alerta de stock bajo </h2>
-          <table>
-            <thead>
-              <tr>
-                <th> SKU </th>
-                <th> Nombre </th>
-                <th> Categoria </th>
-                <th> Stock </th>
-                <th> Mínimo </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in stockBajo":key="p.sku">
-                <td class="mono"> {{p.sku}} </td>
-                <td> {{p.nombre}} </td>
-                <td> {{p.categoria}} </td>
-                <td class="mono"> {{p.cantidad}} </td>
-                <td class="mono"> {{p.stock_minimo}} </td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="metric-grid">
+        <div class="card metric">
+          <span class="metric-label">Productos totales</span>
+          <span class="metric-value mono">
+            {{ resumen.total_productos }}
+          </span>
         </div>
 
-        <div v-else class="card empty-state">
-          No hay productos con stock bajo
+        <div class="card metric">
+          <span class="metric-label">Valor del inventario</span>
+          <span class="metric-value mono">
+            {{ formatQ(resumen.valor_total_inventario_q) }}
+          </span>
         </div>
+
+        <div class="card metric">
+          <span class="metric-label">Pedidos de hoy</span>
+          <span class="metric-value mono">
+            {{ resumen.pedidos_del_dia }}
+          </span>
+        </div>
+
+        <div
+          class="card metric"
+          :class="{ alerta: stockBajo.length }"
+        >
+          <span class="metric-label">
+            Productos con stock bajo
+          </span>
+
+          <span class="metric-value mono">
+            {{ stockBajo.length }}
+          </span>
+        </div>
+      </div>
+
+      <div
+        v-if="stockBajo.length"
+        class="card stock-list"
+      >
+        <h2>Alerta de stock bajo</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Nombre</th>
+              <th>Categoría</th>
+              <th>Stock</th>
+              <th>Mínimo</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr
+              v-for="p in stockBajo"
+              :key="p.sku"
+            >
+              <td class="mono">{{ p.sku }}</td>
+              <td>{{ p.nombre }}</td>
+              <td>{{ p.categoria }}</td>
+              <td class="mono">{{ p.cantidad }}</td>
+              <td class="mono">{{ p.stock_minimo }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        v-else
+        class="card empty-state"
+      >
+        No hay productos con stock bajo.
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-  import {computed, onMounted, ref} from "vue";
-  import {reportesApi} from "../api";
-  
-  const resumen = ref({
-    total_productos: 0,
-    valor_total_inventario_q: 0,
-    pedidos_del_dia: 0,
-  });
+import { computed, onMounted, ref } from "vue";
+import { reportesApi } from "../api";
 
-  const stockBajo = ref([]);
-  const cargando = ref(true);
-  const error = ref("");
+const resumen = ref({
+  total_productos: 0,
+  valor_total_inventario_q: 0,
+  pedidos_del_dia: 0,
+});
 
-  const alertas = computed(() => stockBajo.value ?? []);
+const stockBajo = ref([]);
+const cargando = ref(true);
+const error = ref("");
 
-  function formatQ(valor) {
-    return new Intl.NumberFormat("es-GT", {
-      style: "currency", 
-      currency: "GTQ",
-    }).format(valor ?? 0);
-  } 
+const alertas = computed(() => stockBajo.value ?? []);
 
-  async function cargar() {
-    cargando.value = true;
-    error.value = ""; 
-    try {
-      const data = await reportesApi.resumen();
+function formatQ(valor) {
+  return new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: "GTQ",
+  }).format(valor ?? 0);
+}
 
-      resumen.value = data.resumen ?? {
-        total_productos: 0,
-        valor_total_inventario_q: 0,
-        pedidos_del_dia: 0,
-      }; 
+async function cargar() {
+  cargando.value = true;
+  error.value = "";
 
-      stockBajo.value = data.alertas_stock_bajo ?? [];
-    } catch (e) {
-      error.value = `No se pudo cargar el dashboard: ${e.message}`; 
-    } finally {
-      cargando.value = false;
-    }
+  try {
+    const data = await reportesApi.resumen();
+
+    resumen.value = data.resumen ?? {
+      total_productos: 0,
+      valor_total_inventario_q: 0,
+      pedidos_del_dia: 0,
+    };
+
+    stockBajo.value = data.alertas_stock_bajo ?? [];
+  } catch (e) {
+    error.value = `No se pudo cargar el dashboard: ${e.message}`;
+  } finally {
+    cargando.value = false;
   }
+}
 
-  onMounted(cargar);
+onMounted(cargar);
 </script>
 
 <style scoped>
