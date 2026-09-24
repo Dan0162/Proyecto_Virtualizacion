@@ -24,9 +24,9 @@ INSERT INTO integrantes (carne, nombre) VALUES
 
 CREATE TABLE pedidos (
     id               SERIAL PRIMARY KEY,
-    cliente_id       INTEGER,
+    cliente_id       INTEGER NOT NULL,
     carne_integrante VARCHAR(15) NOT NULL REFERENCES integrantes(carne),
-    estado           VARCHAR(20) NOT NULL DEFAULT 'confirmado'
+    estado           VARCHAR(20) NOT NULL DEFAULT 'pendiente'
                          CHECK (estado IN ('pendiente', 'confirmado', 'cancelado')),
     creado_en        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -118,6 +118,12 @@ export const pedidosApi = {
       method: "POST",
       body: JSON.stringify(pedido),
     }),
+
+  actualizarEstado: (id, estado) =>
+    request(`/pedidos/${id}/estado`, {
+      method: "PATCH",
+      body: JSON.stringify({ estado }),
+    }),
 };
 
 export const reportesApi = {

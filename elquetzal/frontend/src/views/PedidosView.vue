@@ -23,6 +23,15 @@
             required
           />
         </label>
+        <label>
+          Cliente
+          <select v-model="cliente_id" required>
+            <option value="" disabled>Selecciona un cliente…</option>
+            <option v-for="c in clientes" :key="c.id" :value="c.id">
+              {{ c.nombre }} ({{ c.email }})
+            </option>
+          </select>
+        </label>
         <div class="lineas">
           <div
             v-for="(linea, i) in lineas"
@@ -115,6 +124,7 @@
                 <th>Productos</th>
                 <th>Total</th>
                 <th>Estado</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -137,6 +147,12 @@
                 </td>
                 <td>
                   {{ p.estado }}
+                </td>
+                <td>
+                  <template v-if="p.estado === 'pendiente'">
+                    <button class="primary" style="margin-right: 0.5rem; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="cambiarEstadoPedido(p.id, 'confirmado')">✓</button>
+                    <button class="danger" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="cambiarEstadoPedido(p.id, 'cancelado')">✕</button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -166,10 +182,13 @@ import {
   catalogoApi,
   inventarioApi,
   pedidosApi,
+  clientesApi,
 } from "../api";
 
 const productos = ref([]);
 const stock = ref([]);
+const clientes = ref([]);
+const cliente_id = ref("");
 const carne = ref("");
 const lineas = ref([
   {
@@ -242,16 +261,18 @@ function formatMoneda(valor) {
 
 async function cargarProductos() {
   try {
-    const [catalogo, existencias] =
+    const [catalogo, existencias, listaClientes] =
       await Promise.all([
         catalogoApi.listar(),
         inventarioApi.listar(),
+        clientesApi.listar(),
       ]);
     productos.value = catalogo;
     stock.value = existencias;
+    clientes.value = listaClientes;
   } catch (e) {
     errorPedido.value =
-      `No se pudo cargar los productos: ${e.message}`;
+      `No se pudo cargar los datos iniciales: ${e.message}`;
   }
 }
 
@@ -271,6 +292,10 @@ async function cargarHistorial() {
 async function confirmarPedido() {
   errorPedido.value = "";
   mensajeExito.value = "";
+  if (!cliente_id.value) {
+    errorPedido.value = "Debes seleccionar un cliente.";
+    return;
+  }
   if (!carne.value.trim()) {
     errorPedido.value =
       "El carné del integrante es obligatorio.";
@@ -329,13 +354,14 @@ async function confirmarPedido() {
   enviando.value = true;
   try {
     await pedidosApi.crear({
+      cliente_id: cliente_id.value,
       carne_integrante: carne.value,
-      estado: "confirmado",
       detalles,
     });
     mensajeExito.value =
       "Pedido creado correctamente.";
     carne.value = "";
+    cliente_id.value = "";
     lineas.value = [
       {
         sku: "",
@@ -350,6 +376,17 @@ async function confirmarPedido() {
     errorPedido.value = e.message;
   } finally {
     enviando.value = false;
+  }
+}
+
+async function cambiarEstadoPedido(id, nuevoEstado) {
+  try {
+    await pedidosApi.actualizarEstado(id, nuevoEstado);
+    await cargarHistorial();
+    // Also reload products in case stock changed
+    await cargarProductos();
+  } catch (e) {
+    errorHistorial.value = `No se pudo actualizar el estado: ${e.message}`;
   }
 }
 

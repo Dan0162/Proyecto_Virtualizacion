@@ -51,14 +51,14 @@ def validar_pedido(datos):
         return None, "carne_integrante excede el limite de 15 caracteres"
 
     cliente_id = datos.get("cliente_id")
-    if cliente_id is not None and (
+    if cliente_id is None or (
         isinstance(cliente_id, bool)
         or not isinstance(cliente_id, int)
         or cliente_id < 1
     ):
-        return None, "cliente_id debe ser un entero positivo o null"
+        return None, "cliente_id debe ser un entero positivo"
 
-    estado = datos.get("estado", "confirmado")
+    estado = datos.get("estado", "pendiente")
     if not isinstance(estado, str) or estado not in ESTADOS_VALIDOS:
         return None, "estado debe ser pendiente, confirmado o cancelado"
 
@@ -323,6 +323,63 @@ def crear_pedido():
         if isinstance(error, psycopg.errors.IntegrityError):
             return jsonify(error=str(error)), 400
         return jsonify(error="Pedido no guardado; inventario reintegrado"), 500
+@app.patch("/<int:id>/estado")
+def actualizar_estado(id):
+    """Actualiza el estado de un pedido y reintegra el inventario si es cancelado."""
+    if not request.is_json:
+        return jsonify(error="El cuerpo debe enviarse como JSON"), 400
+
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or "estado" not in datos:
+        return jsonify(error="Falta el campo 'estado'"), 400
+
+    nuevo_estado = datos["estado"]
+    if nuevo_estado not in {"confirmado", "cancelado"}:
+        return jsonify(error="estado debe ser confirmado o cancelado"), 400
+
+    try:
+        with connect_db() as conn:
+            with conn.cursor() as cur:
+                # Obtener pedido actual
+                cur.execute(CONSULTA_PEDIDOS + " WHERE p.id = %s", (id,))
+                filas = cur.fetchall()
+                if not filas:
+                    return jsonify(error="Pedido no encontrado"), 404
+                
+                pedido_actual = serializar_pedidos(filas)[0]
+                estado_actual = pedido_actual["estado"]
+
+                if estado_actual != "pendiente":
+                    return jsonify(error=f"No se puede cambiar el estado de un pedido que ya esta {estado_actual}"), 400
+                
+                if nuevo_estado == "cancelado":
+                    # Reintegrar inventario
+                    cantidades = [
+                        {"sku": d["sku"], "cantidad": d["cantidad"]}
+                        for d in pedido_actual["detalles"]
+                    ]
+                    inventario_url = os.getenv("INVENTARIO_URL", "http://inventario:5000")
+                    req = urllib.request.Request(
+                        f"{inventario_url}/stock/reintegrar",
+                        data=json.dumps({"detalles": cantidades}).encode(),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    try:
+                        with urllib.request.urlopen(req, timeout=10) as response:
+                            response.read()
+                    except Exception:
+                        app.logger.exception("Fallo al reintegrar inventario al cancelar pedido")
+                        return jsonify(error="No se pudo reintegrar el inventario, no se cancelo el pedido"), 500
+
+                cur.execute("UPDATE pedidos SET estado = %s WHERE id = %s RETURNING estado", (nuevo_estado, id))
+                estado_actualizado = cur.fetchone()[0]
+                pedido_actual["estado"] = estado_actualizado
+                
+        return jsonify(pedido=pedido_actual), 200
+    except Exception as error:
+        app.logger.exception("Error al actualizar estado")
+        return jsonify(error=str(error)), 500
 
 
 if __name__ == "__main__":

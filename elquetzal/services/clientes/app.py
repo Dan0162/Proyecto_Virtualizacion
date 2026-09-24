@@ -70,15 +70,16 @@ def validar_campos_cliente(datos, campos_requeridos):
 def serializar_cliente(cliente):
     """Convierte una fila de clientes en la respuesta publica del servicio."""
     return {
-        "nombre": cliente[0],
-        "nit": cliente[1],
-        "telefono": cliente[2],
-        "email": cliente[3],
-        "direccion": cliente[4],
+        "id": cliente[0],
+        "nombre": cliente[1],
+        "nit": cliente[2],
+        "telefono": cliente[3],
+        "email": cliente[4],
+        "direccion": cliente[5],
     }
 
 SELECT_CLIENTE = """
-    SELECT nombre, nit, telefono, email, direccion
+    SELECT id, nombre, nit, telefono, email, direccion
     FROM clientes
 """
 
@@ -106,7 +107,8 @@ def crear_cliente():
 
     Request JSON:
         Requiere `nombre`; `nit`, `telefono`, `email` y `direccion` son
-        opcionales. `id` y `creado_en` no forman parte de la API.
+        opcionales. `id` y `creado_en` no forman parte de la API de creación,
+        pero se devuelven en la respuesta.
 
     Returns:
         Estado 201 con el cliente creado, 400 si el NIT ya existe, 422 si los
@@ -129,7 +131,7 @@ def crear_cliente():
                 cur.execute("""
                     INSERT INTO clientes (nombre, nit, telefono, email, direccion)
                     VALUES (%s, %s, %s, %s, %s)
-                    RETURNING nombre, nit, telefono, email, direccion
+                    RETURNING id, nombre, nit, telefono, email, direccion
                 """, tuple(campos.get(campo) for campo in (
                     "nombre", "nit", "telefono", "email", "direccion"
                 )))
@@ -203,7 +205,7 @@ def actualizar_cliente(id):
                     UPDATE clientes
                     SET {columnas}
                     WHERE id = %s
-                    RETURNING nombre, nit, telefono, email, direccion
+                    RETURNING id, nombre, nit, telefono, email, direccion
                 """, valores)
                 cliente = cur.fetchone()
 
