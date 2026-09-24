@@ -1,6 +1,6 @@
-# Esto es solo la base mínima digamos, podes cambiar lo que crear que necesites cambiar.
-# Igual en el otro archivo de requerimientos.
+
 import os
+from collections import Counter
 from flask import Flask, jsonify, request
 
 import psycopg
@@ -28,6 +28,85 @@ def connect_db():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
     )
+
+
+@app.post("/stock/descontar")
+def descontar_stock():
+    """Valida y descuenta todos los SKU en una sola transaccion de inventario."""
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or not isinstance(datos.get("detalles"), list) or not datos["detalles"]:
+        return jsonify(error="detalles debe ser una lista no vacia"), 422
+
+    cantidades = Counter()
+    for detalle in datos["detalles"]:
+        if not isinstance(detalle, dict) or set(detalle) != {"sku", "cantidad"}:
+            return jsonify(error="Cada detalle requiere sku y cantidad"), 422
+        sku, cantidad = detalle["sku"], detalle["cantidad"]
+        if not isinstance(sku, str) or not sku.strip() or len(sku.strip()) > 30:
+            return jsonify(error="sku invalido"), 422
+        if isinstance(cantidad, bool) or not isinstance(cantidad, int) or cantidad <= 0:
+            return jsonify(error="cantidad debe ser un entero positivo"), 422
+        cantidades[sku.strip()] += cantidad
+
+    try:
+        with connect_db() as conn:
+            with conn.cursor() as cur:
+                # Orden estable para evitar deadlocks entre pedidos concurrentes.
+                for sku in sorted(cantidades):
+                    cur.execute(
+                        "SELECT cantidad FROM stock WHERE sku = %s FOR UPDATE", (sku,)
+                    )
+                    fila = cur.fetchone()
+                    if fila is None:
+                        conn.rollback()
+                        return jsonify(error=f"Stock no encontrado para el SKU: {sku}"), 404
+                    if fila[0] < cantidades[sku]:
+                        conn.rollback()
+                        return jsonify(error=f"Stock insuficiente para el SKU: {sku}"), 409
+
+                for sku in sorted(cantidades):
+                    cur.execute(
+                        """UPDATE stock SET cantidad = cantidad - %s,
+                           actualizado_en = now() WHERE sku = %s""",
+                        (cantidades[sku], sku),
+                    )
+        return jsonify(descontado=dict(cantidades)), 200
+    except Exception:
+        app.logger.exception("Fallo al descontar stock")
+        return jsonify(error="No se pudo descontar el stock"), 500
+
+
+@app.post("/stock/reintegrar")
+def reintegrar_stock():
+    """Compensa un descuento si no se pudo registrar el pedido."""
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or not isinstance(datos.get("detalles"), list) or not datos["detalles"]:
+        return jsonify(error="detalles debe ser una lista no vacia"), 422
+    cantidades = Counter()
+    for detalle in datos["detalles"]:
+        if not isinstance(detalle, dict) or set(detalle) != {"sku", "cantidad"}:
+            return jsonify(error="Cada detalle requiere sku y cantidad"), 422
+        sku, cantidad = detalle["sku"], detalle["cantidad"]
+        if not isinstance(sku, str) or not sku.strip() or len(sku.strip()) > 30:
+            return jsonify(error="sku invalido"), 422
+        if isinstance(cantidad, bool) or not isinstance(cantidad, int) or cantidad <= 0:
+            return jsonify(error="cantidad debe ser un entero positivo"), 422
+        cantidades[sku.strip()] += cantidad
+    try:
+        with connect_db() as conn:
+            with conn.cursor() as cur:
+                for sku in sorted(cantidades):
+                    cur.execute(
+                        """UPDATE stock SET cantidad = cantidad + %s,
+                           actualizado_en = now() WHERE sku = %s RETURNING sku""",
+                        (cantidades[sku], sku),
+                    )
+                    if cur.fetchone() is None:
+                        raise ValueError(f"Stock no encontrado: {sku}")
+        return jsonify(reintegrado=dict(cantidades)), 200
+    except Exception:
+        app.logger.exception("Fallo al reintegrar stock")
+        return jsonify(error="No se pudo reintegrar el stock"), 500
 
 def validar_campos_stock(datos, campos_requeridos):
     """Valida y normaliza los campos permitidos de un registro de stock.
