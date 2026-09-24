@@ -1,0 +1,8 @@
+# Los scripts que corren dentro de contenedores Linux (o se ejecutan vía
+# shebang) se rompen si Windows los convierte a CRLF al hacer checkout -
+# es lo que pasó con bd/init/00-databases.sh. Forzamos LF sin importar
+# el core.autocrlf de quien clona el repo.
+*.sh text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
+*.py text eol=lf
