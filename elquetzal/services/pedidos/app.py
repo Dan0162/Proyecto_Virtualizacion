@@ -2,7 +2,7 @@ import json
 import math
 import os
 import urllib.request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from decimal import Decimal, InvalidOperation
 
 import psycopg
@@ -234,31 +234,45 @@ def crear_pedido():
 
     inventario_url = os.getenv("INVENTARIO_URL", "http://inventario:5000")
     
-    # 1. Verificar stock
-    stock_actualizado = {}
-    for detalle in campos["detalles"]:
-        sku = detalle["sku"]
-        cantidad_requerida = detalle["cantidad"]
-        
-        try:
-            req = urllib.request.Request(f"{inventario_url}/stock/{sku}")
-            with urllib.request.urlopen(req) as response:
-                data = json.loads(response.read().decode())
-                stock = data.get("stock", {})
-                
-                # Si el SKU ya se proceso en este pedido, usamos el stock restado, si no, el de la BD
-                cantidad_disponible = stock_actualizado.get(sku, stock.get("cantidad", 0))
-                
-                if cantidad_disponible < cantidad_requerida:
-                    return jsonify(error=f"Stock insuficiente para el SKU: {sku}"), 400
-                    
-                stock_actualizado[sku] = cantidad_disponible - cantidad_requerida
-        except HTTPError as e:
-            if e.code == 404:
-                return jsonify(error=f"Stock no encontrado para el SKU: {sku}"), 400
-            return jsonify(error=f"Error al consultar el stock del SKU: {sku}"), 500
-        except Exception as e:
-            return jsonify(error=f"Error de conexion con inventario: {str(e)}"), 500
+    if not campos["detalles"]:
+        return jsonify(error="El pedido debe incluir al menos un producto"), 422
+
+    try:
+        with connect_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM integrantes WHERE carne = %s", (campos["carne_integrante"],))
+                if cur.fetchone() is None:
+                    return jsonify(error="carne_integrante no existe en integrantes"), 400
+    except Exception:
+        app.logger.exception("No se pudo validar el carné")
+        return jsonify(error="No se pudo validar el carné"), 500
+
+    # Inventario valida y descuenta todos los SKU bajo bloqueos en una transaccion.
+    cantidades = [
+        {"sku": d["sku"], "cantidad": d["cantidad"]}
+        for d in campos["detalles"]
+    ]
+    req = urllib.request.Request(
+        f"{inventario_url}/stock/descontar",
+        data=json.dumps({"detalles": cantidades}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            response.read()
+    except HTTPError as error:
+        if error.code in (404, 409, 422):
+            try:
+                mensaje = json.loads(error.read()).get("error", "Stock no disponible")
+            except (ValueError, UnicodeDecodeError):
+                mensaje = "Stock no disponible"
+            return jsonify(error=mensaje), error.code
+        app.logger.exception("Inventario no pudo procesar el descuento")
+        return jsonify(error="No se pudo confirmar el inventario"), 502
+    except (URLError, TimeoutError):
+        app.logger.exception("No se pudo contactar inventario")
+        return jsonify(error="No se pudo contactar inventario; verifique el stock antes de reintentar"), 503
 
     try:
         with connect_db() as conn:
@@ -281,20 +295,6 @@ def crear_pedido():
                           detalle["precio_unitario_q"]))
                     detalles.append(cur.fetchone())
 
-        # Descontar stock tras exito en BD
-        for sku, nueva_cantidad in stock_actualizado.items():
-            try:
-                req = urllib.request.Request(
-                    f"{inventario_url}/stock/{sku}",
-                    data=json.dumps({"cantidad": nueva_cantidad}).encode(),
-                    headers={"Content-Type": "application/json"},
-                    method="PUT"
-                )
-                with urllib.request.urlopen(req) as response:
-                    pass
-            except Exception as e:
-                print(f"Error descontando stock para {sku}: {e}")
-
         respuesta = {
             "id": pedido[0],
             "cliente_id": pedido[1],
@@ -304,15 +304,27 @@ def crear_pedido():
             "detalles": [serializar_detalle(detalle) for detalle in detalles],
         }
         return jsonify(pedido=respuesta), 201
-    except psycopg.errors.ForeignKeyViolation:
-        return jsonify(error="carne_integrante no existe en integrantes"), 400
-    except psycopg.errors.IntegrityError as error:
-        return jsonify(error=str(error)), 400
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Pedido no guardado tras descontar inventario: %s", error)
+        try:
+            reintegro = urllib.request.Request(
+                f"{inventario_url}/stock/reintegrar",
+                data=json.dumps({"detalles": cantidades}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(reintegro, timeout=10) as response:
+                response.read()
+        except Exception:
+            app.logger.exception("Compensacion fallida: conciliar inventario manualmente")
+            return jsonify(error="Pedido no guardado y reintegro fallido; requiere conciliacion"), 500
+        if isinstance(error, psycopg.errors.ForeignKeyViolation):
+            return jsonify(error="carne_integrante no existe en integrantes"), 400
+        if isinstance(error, psycopg.errors.IntegrityError):
+            return jsonify(error=str(error)), 400
+        return jsonify(error="Pedido no guardado; inventario reintegrado"), 500
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
 

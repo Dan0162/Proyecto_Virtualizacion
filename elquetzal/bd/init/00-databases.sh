@@ -39,12 +39,5 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     GRANT CONNECT ON DATABASE pedidos_db    TO pedidos_user;
     GRANT CONNECT ON DATABASE reportes_db   TO reportes_user;
 
-    -- "reportes" (Área 5) arma el dashboard leyendo catalogo_db, inventario_db
-    -- y pedidos_db directamente (no vía las APIs). Se le da acceso de solo
-    -- lectura a esas tres bases; el resto de reportes_user sigue igual de
-    -- aislado (no puede escribir en ninguna de ellas). Los GRANT sobre tablas
-    -- puntuales están en cada script 0X-*.sql, después de crear la tabla.
-    GRANT CONNECT ON DATABASE catalogo_db   TO reportes_user;
-    GRANT CONNECT ON DATABASE inventario_db TO reportes_user;
-    GRANT CONNECT ON DATABASE pedidos_db    TO reportes_user;
+    -- Reportes consulta APIs internas y solo posee acceso a reportes_db.
 EOSQL

@@ -27,5 +27,3 @@ INSERT INTO stock (sku, cantidad, stock_minimo) VALUES
 
 RESET ROLE;
 
--- Lectura para el dashboard de "reportes" (Área 5). Sin INSERT/UPDATE/DELETE.
-GRANT SELECT ON stock TO reportes_user;

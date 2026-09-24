@@ -97,11 +97,11 @@ Cada base solo es accesible por su propio rol (`catalogo_user`, `inventario_user
 - `pedidos(id, cliente_id, carne_integrante FK → integrantes, estado, creado_en)`
 - `detalle_pedido(id, pedido_id FK → pedidos, sku, cantidad, precio_unitario_q)`
 
-**reportes_db** — sin tablas propias. Backend de dominio (Área 5) arma el dashboard leyendo directamente `catalogo_db.productos`, `inventario_db.stock` y `pedidos_db.pedidos` (no vía las APIs de esos servicios). Para eso, `reportes_user` tiene permisos de **solo lectura** sobre esas tres bases — `GRANT CONNECT` en `00-databases.sh` y `GRANT SELECT` sobre cada tabla puntual al final de `01-catalogo.sql`, `02-inventario.sql` y `04-pedidos.sql` — sin poder escribir en ninguna de las tres. Si esa lógica necesita persistir algo propio (p. ej. una tabla de caché de métricas), se puede crear en `reportes_db` siguiendo el patrón comentado en `05-reportes.sql`.
+**reportes_db** — sin tablas propias y sin acceso a las demás bases: `reportes` arma el dashboard llamando a las APIs de `catalogo`, `inventario` y `pedidos` (no lee sus bases de datos directamente), así que `reportes_user` solo tiene permisos sobre `reportes_db`. Si esa lógica necesita persistir algo propio (p. ej. una tabla de caché de métricas), se puede crear ahí siguiendo el patrón comentado en `05-reportes.sql`.
 
 ### Sobre las referencias entre servicios
 
-`pedidos.cliente_id` y `detalle_pedido.sku` son referencias **lógicas** a `clientes_db.clientes.id` y `catalogo_db.productos.sku`: no existen FKs reales porque cada microservicio tiene su propia base de datos aislada. La validación cruzada al crear un pedido (¿alcanza el stock?) la hace el backend (Área 5) llamando a la API de `inventario`; `reportes`, en cambio, lee las otras bases directamente porque es un servicio de solo-lectura para agregación, no de escritura.
+`pedidos.cliente_id` y `detalle_pedido.sku` son referencias **lógicas** a `clientes_db.clientes.id` y `catalogo_db.productos.sku`: no existen FKs reales porque cada microservicio tiene su propia base de datos aislada. Toda validación cruzada (¿alcanza el stock?, métricas del dashboard) la hacen los backends (Área 5) llamando a las APIs de los otros microservicios, nunca conectándose directo a una base ajena.
 
 ---
 
@@ -254,3 +254,74 @@ Todos los endpoints están prefijados por el API Gateway. La base de la URL asum
       ]
     }
     ```
+# Publicación de imágenes en Docker Hub 
+
+## 1. Crear cuenta / namespace del grupo
+
+Uno de los integrantes crea (o ya tiene) una cuenta en https://hub.docker.com.
+Ese usuario (o una organización creada ahí) es el `DOCKERHUB_USER` que va en
+el `.env` de la raíz.
+
+## 2. Login desde la VM (o el host, si el build se hace ahí)
+
+```bash
+docker login -u <usuario_dockerhub>
+```
+
+Pide el password o, mejor, un **Access Token** (Docker Hub → Account
+Settings → Security → New Access Token) para no guardar la contraseña real
+en ningún lado.
+
+## 3. Completar el .env
+
+En `elquetzal/.env` (ver [Cómo levantar el proyecto](#cómo-levantar-el-proyecto)), editar `DOCKERHUB_USER` y `TAG`.
+
+## 4. Build + push de todas las imágenes
+
+Opción A — script automático (recomendado):
+
+```bash
+./scripts/build-and-push.sh
+```
+
+Opción B — manual, servicio por servicio:
+
+```bash
+docker build -t <usuario>/elquetzal-catalogo:latest ./services/catalogo
+docker push <usuario>/elquetzal-catalogo:latest
+# repetir para inventario, clientes, pedidos, reportes
+docker build -t <usuario>/elquetzal-gateway:latest -f gateway/Dockerfile .
+docker push <usuario>/elquetzal-gateway:latest
+```
+
+## 5. Verificar
+
+Abrir `https://hub.docker.com/u/<usuario_dockerhub>` y confirmar que
+aparecen los 6 repositorios (`elquetzal-catalogo`, `elquetzal-inventario`,
+`elquetzal-clientes`, `elquetzal-pedidos`, `elquetzal-reportes`,
+`elquetzal-gateway`). Esa URL es la evidencia a incluir en la entrega.
+
+## 6. Levantar el stack usando las imágenes publicadas (no build local)
+
+Para la demo en vivo, una vez publicadas las imágenes, `docker compose up`
+puede usar directamente las imágenes de Docker Hub en lugar de reconstruir,
+quitando el bloque `build:` de cada servicio o corriendo:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Convención de nombres y tags
+
+| Imagen                          | Repositorio en Docker Hub              |
+|----------------------------------|-----------------------------------------|
+| gateway                          | `<usuario>/elquetzal-gateway`           |
+| catalogo                         | `<usuario>/elquetzal-catalogo`          |
+| inventario                       | `<usuario>/elquetzal-inventario`        |
+| clientes                         | `<usuario>/elquetzal-clientes`          |
+| pedidos                          | `<usuario>/elquetzal-pedidos`           |
+| reportes                         | `<usuario>/elquetzal-reportes`          |
+
+`TAG` por defecto es `latest`; para versionar releases de la demo se puede
+usar `TAG=s12` u otro identificador al correr el script.

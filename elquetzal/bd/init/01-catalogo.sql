@@ -26,5 +26,3 @@ INSERT INTO productos (sku, nombre, categoria, precio_q) VALUES
 
 RESET ROLE;
 
--- Lectura para el dashboard de "reportes" (Área 5). Sin INSERT/UPDATE/DELETE.
-GRANT SELECT ON productos TO reportes_user;

@@ -1,111 +1,98 @@
+import json
 import os
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, timedelta
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from urllib.error import HTTPError, URLError
 
-import psycopg
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 SERVICE_NAME = "reportes"
+TIMEOUT = 5
 
 
 @app.get("/health")
 def health():
     return jsonify(status="ok", service=SERVICE_NAME)
 
-def connect_db(prefix, default_name):
-    """Abre una conexion usando variables especificas para cada base."""
-    return psycopg.connect(
-        host=os.getenv(f"{prefix}_DB_HOST", os.getenv("DB_HOST")),
-        port=os.getenv(f"{prefix}_DB_PORT", os.getenv("DB_PORT", "5432")),
-        dbname=os.getenv(f"{prefix}_DB_NAME", default_name),
-        user=os.getenv(f"{prefix}_DB_USER", os.getenv("DB_USER")),
-        password=os.getenv(f"{prefix}_DB_PASSWORD", os.getenv("DB_PASSWORD")),
-    )
+
+def consultar_api(url, clave):
+    """Consulta un servicio interno y valida la estructura de su respuesta."""
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT) as response:
+            datos = json.load(response)
+    except (HTTPError, URLError, TimeoutError, ValueError) as error:
+        raise RuntimeError(f"Error al consultar {clave}") from error
+    if not isinstance(datos, dict) or not isinstance(datos.get(clave), list):
+        raise ValueError(f"Respuesta invalida del servicio {clave}")
+    return datos[clave]
 
 
 def consultar_catalogo():
-    """Obtiene el total y los precios necesarios para valorar inventario."""
-    with connect_db("CATALOGO", "catalogo_db") as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT sku, nombre, categoria, precio_q,
-                       COUNT(*) OVER () AS total_productos
-                FROM productos
-            """)
-            filas = cur.fetchall()
-
-    total_productos = filas[0][4] if filas else 0
-    productos = {
-        fila[0]: {
-            "nombre": fila[1],
-            "categoria": fila[2],
-            "precio_q": fila[3],
-        }
-        for fila in filas
-    }
-    return total_productos, productos
+    return consultar_api(
+        os.getenv("CATALOGO_URL", "http://catalogo:5000").rstrip("/") + "/productos",
+        "productos",
+    )
 
 
 def consultar_inventario():
-    """Obtiene existencias y detecta alertas en una sola consulta."""
-    with connect_db("INVENTARIO", "inventario_db") as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT sku, cantidad, stock_minimo
-                FROM stock
-            """)
-            existencias = cur.fetchall()
-    return existencias, [fila for fila in existencias if fila[2] > fila[1]]
+    return consultar_api(
+        os.getenv("INVENTARIO_URL", "http://inventario:5000").rstrip("/") + "/stock",
+        "stock",
+    )
 
 
-def contar_pedidos_del_dia(fecha):
-    """Cuenta pedidos creados dentro del dia solicitado."""
-    fecha_siguiente = fecha + timedelta(days=1)
-    with connect_db("PEDIDOS", "pedidos_db") as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM pedidos
-                WHERE creado_en >= %s
-                  AND creado_en < %s
-            """, (fecha, fecha_siguiente))
-            return cur.fetchone()[0]
+def consultar_pedidos():
+    return consultar_api(
+        os.getenv("PEDIDOS_URL", "http://pedidos:5000").rstrip("/") + "/",
+        "pedidos",
+    )
 
 
 def generar_reporte(fecha):
-    """Consulta las tres bases en paralelo y combina sus resultados."""
+    """Combina respuestas de las tres APIs sin acceder a sus bases de datos."""
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futuro_catalogo = executor.submit(consultar_catalogo)
-        futuro_inventario = executor.submit(consultar_inventario)
-        futuro_pedidos = executor.submit(contar_pedidos_del_dia, fecha)
+        productos_f = executor.submit(consultar_catalogo)
+        stock_f = executor.submit(consultar_inventario)
+        pedidos_f = executor.submit(consultar_pedidos)
+        productos_lista = productos_f.result()
+        stock_lista = stock_f.result()
+        pedidos_lista = pedidos_f.result()
 
-        total_productos, productos = futuro_catalogo.result()
-        existencias, filas_alertas = futuro_inventario.result()
-        pedidos_del_dia = futuro_pedidos.result()
-
+    productos = {producto["sku"]: producto for producto in productos_lista}
     valor_total = Decimal("0")
-    for sku, cantidad, _ in existencias:
-        producto = productos.get(sku)
-        if producto is not None:
-            valor_total += producto["precio_q"] * cantidad
-
     alertas = []
-    for sku, cantidad, stock_minimo in filas_alertas:
+
+    for existencia in stock_lista:
+        sku = existencia["sku"]
+        cantidad = existencia["cantidad"]
+        minimo = existencia["stock_minimo"]
         producto = productos.get(sku, {})
-        alertas.append({
-            "sku": sku,
-            "nombre": producto.get("nombre"),
-            "categoria": producto.get("categoria"),
-            "cantidad": cantidad,
-            "stock_minimo": stock_minimo,
-        })
+        if producto:
+            valor_total += Decimal(str(producto["precio_q"])) * cantidad
+        if cantidad < minimo:
+            alertas.append({
+                "sku": sku,
+                "nombre": producto.get("nombre"),
+                "categoria": producto.get("categoria"),
+                "cantidad": cantidad,
+                "stock_minimo": minimo,
+            })
+
+    pedidos_del_dia = 0
+    for pedido in pedidos_lista:
+        creado_en = datetime.fromisoformat(pedido["creado_en"].replace("Z", "+00:00"))
+        if creado_en.tzinfo is None:
+            creado_en = creado_en.replace(tzinfo=timezone.utc)
+        if creado_en.astimezone(timezone.utc).date() == fecha:
+            pedidos_del_dia += 1
 
     return {
         "fecha": fecha.isoformat(),
         "resumen": {
-            "total_productos": total_productos,
+            "total_productos": len(productos_lista),
             "valor_total_inventario_q": float(valor_total),
             "pedidos_del_dia": pedidos_del_dia,
         },
@@ -115,16 +102,6 @@ def generar_reporte(fecha):
 
 @app.get("/")
 def get_reporte():
-    """Genera el resumen de catalogo, inventario y pedidos.
-
-    Query params:
-        fecha: Fecha opcional en formato `YYYY-MM-DD`. Si se omite, se usa la
-        fecha del servidor.
-
-    Returns:
-        Estado 200 con el resumen, 400 si la fecha es invalida y 500 ante un
-        fallo de conexion o consulta a las bases de datos.
-    """
     fecha_texto = request.args.get("fecha")
     if fecha_texto:
         try:
@@ -132,12 +109,13 @@ def get_reporte():
         except ValueError:
             return jsonify(error="fecha debe tener el formato YYYY-MM-DD"), 400
     else:
-        fecha = date.today()
+        fecha = datetime.now(timezone.utc).date()
 
     try:
         return jsonify(generar_reporte(fecha)), 200
-    except Exception as error:
-        return jsonify(error=str(error)), 500
+    except (RuntimeError, ValueError, KeyError, TypeError, ArithmeticError):
+        app.logger.exception("No se pudo generar el reporte")
+        return jsonify(error="No se pudo consultar uno de los servicios"), 502
 
 
 if __name__ == "__main__":
