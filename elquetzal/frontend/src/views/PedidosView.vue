@@ -131,6 +131,8 @@
               <tr
                 v-for="p in pedidos"
                 :key="p.id"
+                @click="verDetalles(p)"
+                class="clickable-row"
               >
                 <td class="mono">
                   {{ formatFecha(p.creado_en) }}
@@ -150,8 +152,8 @@
                 </td>
                 <td>
                   <template v-if="p.estado === 'pendiente'">
-                    <button class="primary" style="margin-right: 0.5rem; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="cambiarEstadoPedido(p.id, 'confirmado')">✓</button>
-                    <button class="danger" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="cambiarEstadoPedido(p.id, 'cancelado')">✕</button>
+                    <button class="primary" style="margin-right: 0.5rem; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click.stop="cambiarEstadoPedido(p.id, 'confirmado')">✓</button>
+                    <button class="danger" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click.stop="cambiarEstadoPedido(p.id, 'cancelado')">✕</button>
                   </template>
                 </td>
               </tr>
@@ -166,6 +168,42 @@
           class="empty-state"
         >
           Todavía no hay pedidos registrados.
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal de Detalles del Pedido -->
+    <div v-if="mostrarModal" class="modal-overlay" @click="cerrarModal">
+      <div class="modal-content" @click.stop>
+        <header class="modal-header">
+          <h2>Detalles del Pedido #{{ pedidoSeleccionado.id }}</h2>
+          <button class="close-button" @click="cerrarModal">✕</button>
+        </header>
+        <div class="modal-body">
+          <p><strong>Cliente:</strong> {{ getNombreCliente(pedidoSeleccionado.cliente_id) }}</p>
+          <p><strong>Carné_responsable:</strong> {{ pedidoSeleccionado.carne_integrante }}</p>
+          <p><strong>Estado:</strong> {{ pedidoSeleccionado.estado }}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="d in pedidoSeleccionado.detalles" :key="d.id">
+                <td>{{ getNombreProducto(d.sku) }} ({{ d.sku }})</td>
+                <td>{{ d.cantidad }}</td>
+                <td class="mono">{{ formatMoneda(d.precio_unitario_q) }}</td>
+                <td class="mono">{{ formatMoneda(d.cantidad * d.precio_unitario_q) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="mono total-general">
+            Total: {{ formatMoneda(totalPedido(pedidoSeleccionado)) }}
+          </p>
         </div>
       </div>
     </div>
@@ -203,6 +241,9 @@ const pedidos = ref([]);
 const cargandoHistorial = ref(true);
 const errorHistorial = ref("");
 
+const pedidoSeleccionado = ref(null);
+const mostrarModal = ref(false);
+
 const productosDisponibles = computed(() => {
   const stockPorSku = new Map(
     stock.value.map((item) => [
@@ -225,6 +266,26 @@ const productosDisponibles = computed(() => {
 const totalGeneral = computed(() =>
   pedidos.value.reduce((suma, p) => suma + totalPedido(p), 0)
 );
+
+function verDetalles(pedido) {
+  pedidoSeleccionado.value = pedido;
+  mostrarModal.value = true;
+}
+
+function cerrarModal() {
+  mostrarModal.value = false;
+  pedidoSeleccionado.value = null;
+}
+
+function getNombreProducto(sku) {
+  const producto = productos.value.find((p) => p.sku === sku);
+  return producto ? producto.nombre : sku;
+}
+
+function getNombreCliente(id) {
+  const cliente = clientes.value.find((c) => c.id === id);
+  return cliente ? cliente.nombre : `ID: ${id}`;
+}
 
 function agregarLinea() {
   lineas.value.push({
@@ -448,4 +509,57 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 } */
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.clickable-row:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: var(--color-surface);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.close-button {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+}
+.close-button:hover {
+  border-color: transparent;
+  color: var(--color-accent);
+}
+.modal-body p {
+  margin: 0.25rem 0;
+}
+.modal-body table {
+  margin-top: 1rem;
+}
 </style>
