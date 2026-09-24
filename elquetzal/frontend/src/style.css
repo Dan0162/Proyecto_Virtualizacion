@@ -1,0 +1,139 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  --color-bg: #f6f4ee;
+  --color-surface: #ffffff;
+  --color-ink: #20261f;
+  --color-ink-muted: #6b7568;
+  --color-primary: #1b4b3a;
+  --color-primary-hover: #15382c;
+  --color-accent: #b8452f;
+  --color-accent-hover: #96371f;
+  --color-border: #e1ddd0;
+
+  --font-ui: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  padding: 0.5rem 0.9rem;
+  transition: border-color 0.15s ease;
+}
+
+button:hover {
+  border-color: var(--color-primary);
+}
+
+button.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+button.primary:hover {
+  background: var(--color-primary-hover);
+}
+
+button.danger {
+  color: var(--color-accent);
+}
+
+button.danger:hover {
+  border-color: var(--color-accent);
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th {
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.empty-state,
+.error-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-ink-muted);
+}
+
+.error-state {
+  color: var(--color-accent);
+}
