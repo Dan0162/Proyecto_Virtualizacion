@@ -174,3 +174,77 @@ Todos los endpoints están prefijados por el API Gateway. La base de la URL asum
       ]
     }
     ```
+# Publicación de imágenes en Docker Hub 
+
+## 1. Crear cuenta / namespace del grupo
+
+Uno de los integrantes crea (o ya tiene) una cuenta en https://hub.docker.com.
+Ese usuario (o una organización creada ahí) es el `DOCKERHUB_USER` que va en
+el `.env` de la raíz.
+
+## 2. Login desde la VM (o el host, si el build se hace ahí)
+
+```bash
+docker login -u <usuario_dockerhub>
+```
+
+Pide el password o, mejor, un **Access Token** (Docker Hub → Account
+Settings → Security → New Access Token) para no guardar la contraseña real
+en ningún lado.
+
+## 3. Completar el .env
+
+```bash
+cp .env.example .env
+# editar DOCKERHUB_USER y TAG
+```
+
+## 4. Build + push de todas las imágenes
+
+Opción A — script automático (recomendado):
+
+```bash
+./scripts/build-and-push.sh
+```
+
+Opción B — manual, servicio por servicio:
+
+```bash
+docker build -t <usuario>/elquetzal-catalogo:latest ./services/catalogo
+docker push <usuario>/elquetzal-catalogo:latest
+# repetir para inventario, clientes, pedidos, reportes
+docker build -t <usuario>/elquetzal-gateway:latest -f gateway/Dockerfile .
+docker push <usuario>/elquetzal-gateway:latest
+```
+
+## 5. Verificar
+
+Abrir `https://hub.docker.com/u/<usuario_dockerhub>` y confirmar que
+aparecen los 6 repositorios (`elquetzal-catalogo`, `elquetzal-inventario`,
+`elquetzal-clientes`, `elquetzal-pedidos`, `elquetzal-reportes`,
+`elquetzal-gateway`). Esa URL es la evidencia a incluir en la entrega.
+
+## 6. Levantar el stack usando las imágenes publicadas (no build local)
+
+Para la demo en vivo, una vez publicadas las imágenes, `docker compose up`
+puede usar directamente las imágenes de Docker Hub en lugar de reconstruir,
+quitando el bloque `build:` de cada servicio o corriendo:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Convención de nombres y tags
+
+| Imagen                          | Repositorio en Docker Hub              |
+|----------------------------------|-----------------------------------------|
+| gateway                          | `<usuario>/elquetzal-gateway`           |
+| catalogo                         | `<usuario>/elquetzal-catalogo`          |
+| inventario                       | `<usuario>/elquetzal-inventario`        |
+| clientes                         | `<usuario>/elquetzal-clientes`          |
+| pedidos                          | `<usuario>/elquetzal-pedidos`           |
+| reportes                         | `<usuario>/elquetzal-reportes`          |
+
+`TAG` por defecto es `latest`; para versionar releases de la demo se puede
+usar `TAG=s12` u otro identificador al correr el script.
