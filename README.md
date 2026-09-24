@@ -17,11 +17,91 @@ El backend está compuesto por las siguientes piezas fundamentales:
 
 ## Cómo levantar el proyecto
 
-Asegúrate de contar con un archivo `.env` en el directorio `elquetzal/` con las contraseñas de las bases de datos. Luego, ejecuta:
+Nunca hay contraseñas quemadas en el código: no hay plantillas `.env.example` en el repo (se quitaron una vez el equipo configuró sus `.env` reales), así que cada quien crea estos archivos directamente, a mano. Los `.env` reales están en `.gitignore`, nunca se commitean.
+
+1. `elquetzal/.env` (junto a `docker-compose.yml`) — lo lee Compose para sustituir `${...}` y se lo pasa al contenedor `db`:
+   ```
+   DOCKERHUB_USER=<usuario de Docker Hub del grupo>
+   TAG=latest
+   PG_SUPERUSER=postgres
+   PG_SUPERUSER_PASSWORD=<password del superusuario de Postgres>
+   CATALOGO_DB_PASSWORD=<password de catalogo_user>
+   INVENTARIO_DB_PASSWORD=<password de inventario_user>
+   CLIENTES_DB_PASSWORD=<password de clientes_user>
+   PEDIDOS_DB_PASSWORD=<password de pedidos_user>
+   REPORTES_DB_PASSWORD=<password de reportes_user>
+   ```
+2. `elquetzal/services/<servicio>/.env` — cómo se conecta cada microservicio a **su** base (mismo esquema para `catalogo`, `inventario`, `clientes`, `pedidos`, `reportes`):
+   ```
+   DB_HOST=db
+   DB_PORT=5432
+   DB_NAME=<servicio>_db
+   DB_USER=<servicio>_user
+   DB_PASSWORD=<debe ser igual a <SERVICIO>_DB_PASSWORD del .env de la raíz>
+   ```
+   `reportes/.env` no necesita nada extra: `reportes_user` ya tiene acceso de solo lectura a `catalogo_db`, `inventario_db` y `pedidos_db` (ver [Base de Datos](#base-de-datos-área-4)), así que reutiliza estas mismas 5 líneas para las 4 bases.
+
+Con los `.env` listos:
 
 ```bash
 docker compose up -d --build
 ```
+
+### Probar solo la base de datos (sin levantar todo el stack)
+
+```bash
+docker compose up -d db
+docker exec -it elquetzal-db psql -U pedidos_user -d pedidos_db -c "select * from integrantes;"
+```
+
+### Volver a sembrar los datos
+
+Los scripts de `elquetzal/bd/init/` solo corren si el volumen está vacío. Para forzar que vuelvan a correr en desarrollo (esto borra todos los datos):
+
+```bash
+docker compose down -v
+docker compose up -d db
+```
+
+---
+
+## Base de Datos (Área 4)
+
+Un solo motor Postgres (`postgres:16-alpine`), con **una base de datos y un rol independientes por microservicio**. Los scripts en `elquetzal/bd/init/` se montan en `/docker-entrypoint-initdb.d` del contenedor `db` y corren una sola vez, la primera vez que arrancan con el volumen `db_data` vacío.
+
+| Orden | Script | Qué hace |
+|---|---|---|
+| `00-databases.sh` | Crea los 5 roles y las 5 bases de datos (uno por servicio) |
+| `01-catalogo.sql` | Esquema + seed de `catalogo_db` |
+| `02-inventario.sql` | Esquema + seed de `inventario_db` |
+| `03-clientes.sql` | Esquema + seed de `clientes_db` |
+| `04-pedidos.sql` | Esquema + seed de `pedidos_db`, incluye la tabla `integrantes` (evidencia de carnés) |
+| `05-reportes.sql` | Solo comentario — rol/BD ya creados, sin esquema propio |
+
+Cada base solo es accesible por su propio rol (`catalogo_user`, `inventario_user`, `clientes_user`, `pedidos_user`, `reportes_user`); las tablas quedan creadas directamente por ese rol (`SET ROLE ... RESET ROLE` dentro de cada script), no por el superusuario.
+
+### Modelo de datos por servicio
+
+**catalogo_db** — datos maestros de producto (sin stock):
+- `productos(id, sku UNIQUE, nombre, categoria, precio_q, creado_en)`
+
+**inventario_db** — cantidades en existencia:
+- `stock(id, sku UNIQUE, cantidad, stock_minimo, actualizado_en)`
+- Seed incluye 2 SKUs por debajo de `stock_minimo` a propósito, para demostrar la alerta de stock bajo del dashboard.
+
+**clientes_db**:
+- `clientes(id, nombre, nit UNIQUE, telefono, email, direccion, creado_en)`
+
+**pedidos_db**:
+- `integrantes(carne PK, nombre)` — los 5 carnés del equipo (evidencia personalizada requerida por el enunciado).
+- `pedidos(id, cliente_id, carne_integrante FK → integrantes, estado, creado_en)`
+- `detalle_pedido(id, pedido_id FK → pedidos, sku, cantidad, precio_unitario_q)`
+
+**reportes_db** — sin tablas propias y sin acceso a las demás bases: `reportes` arma el dashboard llamando a las APIs de `catalogo`, `inventario` y `pedidos` (no lee sus bases de datos directamente), así que `reportes_user` solo tiene permisos sobre `reportes_db`. Si esa lógica necesita persistir algo propio (p. ej. una tabla de caché de métricas), se puede crear ahí siguiendo el patrón comentado en `05-reportes.sql`.
+
+### Sobre las referencias entre servicios
+
+`pedidos.cliente_id` y `detalle_pedido.sku` son referencias **lógicas** a `clientes_db.clientes.id` y `catalogo_db.productos.sku`: no existen FKs reales porque cada microservicio tiene su propia base de datos aislada. Toda validación cruzada (¿alcanza el stock?, métricas del dashboard) la hacen los backends (Área 5) llamando a las APIs de los otros microservicios, nunca conectándose directo a una base ajena.
 
 ---
 
@@ -194,10 +274,7 @@ en ningún lado.
 
 ## 3. Completar el .env
 
-```bash
-cp .env.example .env
-# editar DOCKERHUB_USER y TAG
-```
+En `elquetzal/.env` (ver [Cómo levantar el proyecto](#cómo-levantar-el-proyecto)), editar `DOCKERHUB_USER` y `TAG`.
 
 ## 4. Build + push de todas las imágenes
 
