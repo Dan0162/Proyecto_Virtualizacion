@@ -21,7 +21,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PG_SUPERUSER}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${PG_SUPERUSER}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -97,6 +97,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      catalogo:
+        condition: service_started
+      inventario:
+        condition: service_started
+      pedidos:
+        condition: service_started
     networks:
       - internal
 
