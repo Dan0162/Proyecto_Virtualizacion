@@ -16,7 +16,6 @@ services:
       REPORTES_DB_PASSWORD: ${REPORTES_DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # Área 4 (Datos) coloca aquí sus scripts .sql
       - ./bd/init:/docker-entrypoint-initdb.d:ro
     networks:
       - internal
