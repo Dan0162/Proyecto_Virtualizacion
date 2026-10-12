@@ -6,12 +6,10 @@ import psycopg
 app = Flask(__name__)
 SERVICE_NAME = "catalogo"
 
-# Verificar si el servicio está "vivo".
 @app.get("/health")
 def health():
     return jsonify(status="ok", service=SERVICE_NAME)
 
-# Leemos el nombre y host de la base de datos (lo tiene que poner Daniel luego en el .env)
 @app.get("/")
 def index():
     return jsonify(message=f"Microservicio {SERVICE_NAME} de El Quetzal", db_host=os.getenv("DB_HOST"), db_name=os.getenv("DB_NAME"))
@@ -106,7 +104,8 @@ def get_productos():
         ])
                 
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.post("/productos")
 def crear_producto():
@@ -151,7 +150,8 @@ def crear_producto():
     except psycopg.errors.UniqueViolation:
         return jsonify(error="Ya existe un producto con ese SKU"), 400
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.put("/productos/<sku>")
 def actualizar_producto(sku):
@@ -214,7 +214,8 @@ def actualizar_producto(sku):
         }), 200
 
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.get("/productos/<sku>")
 def get_producto_por_sku(sku):
@@ -249,7 +250,8 @@ def get_producto_por_sku(sku):
         }), 200
 
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 
 @app.delete("/productos/<sku>")
@@ -282,11 +284,11 @@ def eliminar_producto(sku):
         ), 201
 
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 
 # Solo sirve para debug fuera del contenedor, el servicio lo arranca gunicorn
 if __name__ == "__main__":
     # Escuchamos el 0.0.0.0 y no 127.0.0.1 para que pueda ser alcanzado.
     app.run(host="0.0.0.0", port=5000)
-

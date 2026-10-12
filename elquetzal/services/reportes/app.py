@@ -2,7 +2,8 @@ import json
 import os
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 
@@ -11,6 +12,7 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 SERVICE_NAME = "reportes"
 TIMEOUT = 5
+ZONA = ZoneInfo("America/Guatemala")
 
 
 @app.get("/health")
@@ -44,11 +46,13 @@ def consultar_inventario():
     )
 
 
-def consultar_pedidos():
-    return consultar_api(
-        os.getenv("PEDIDOS_URL", "http://pedidos:5000").rstrip("/") + "/",
-        "pedidos",
-    )
+def contar_pedidos(fecha):
+    url = os.getenv("PEDIDOS_URL", "http://pedidos:5000").rstrip("/") + f"/conteo?fecha={fecha.isoformat()}"
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT) as response:
+            return int(json.load(response)["total"])
+    except (HTTPError, URLError, TimeoutError, ValueError, KeyError) as error:
+        raise RuntimeError("Error al consultar pedidos") from error
 
 
 def generar_reporte(fecha):
@@ -56,10 +60,10 @@ def generar_reporte(fecha):
     with ThreadPoolExecutor(max_workers=3) as executor:
         productos_f = executor.submit(consultar_catalogo)
         stock_f = executor.submit(consultar_inventario)
-        pedidos_f = executor.submit(consultar_pedidos)
+        pedidos_f = executor.submit(contar_pedidos, fecha)
         productos_lista = productos_f.result()
         stock_lista = stock_f.result()
-        pedidos_lista = pedidos_f.result()
+        pedidos_del_dia = pedidos_f.result()
 
     productos = {producto["sku"]: producto for producto in productos_lista}
     valor_total = Decimal("0")
@@ -81,14 +85,6 @@ def generar_reporte(fecha):
                 "stock_minimo": minimo,
             })
 
-    pedidos_del_dia = 0
-    for pedido in pedidos_lista:
-        creado_en = datetime.fromisoformat(pedido["creado_en"].replace("Z", "+00:00"))
-        if creado_en.tzinfo is None:
-            creado_en = creado_en.replace(tzinfo=timezone.utc)
-        if creado_en.astimezone(timezone.utc).date() == fecha:
-            pedidos_del_dia += 1
-
     return {
         "fecha": fecha.isoformat(),
         "resumen": {
@@ -109,14 +105,10 @@ def get_reporte():
         except ValueError:
             return jsonify(error="fecha debe tener el formato YYYY-MM-DD"), 400
     else:
-        fecha = datetime.now(timezone.utc).date()
+        fecha = datetime.now(ZONA).date()
 
     try:
         return jsonify(generar_reporte(fecha)), 200
     except (RuntimeError, ValueError, KeyError, TypeError, ArithmeticError):
         app.logger.exception("No se pudo generar el reporte")
         return jsonify(error="No se pudo consultar uno de los servicios"), 502
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
