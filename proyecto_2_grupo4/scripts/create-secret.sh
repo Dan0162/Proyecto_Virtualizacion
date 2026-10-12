@@ -6,6 +6,12 @@
 set -euo pipefail
 NS=proyecto-2-grupo-4
 gen() { openssl rand -hex 12; }
+# Postgres crea los roles solo en el primer arranque: regenerar el Secret despues
+# dejaria contrasenas distintas a las de la base. Si ya existe no se toca
+# (FORCE=1 para recrearlo, solo junto con borrar el PVC).
+if kubectl -n "$NS" get secret db-credentials-grupo-4 >/dev/null 2>&1 && [ "${FORCE:-0}" != 1 ]; then
+  echo "Secret ya existe, se conserva"; exit 0
+fi
 kubectl -n "$NS" delete secret db-credentials-grupo-4 --ignore-not-found
 kubectl -n "$NS" create secret generic db-credentials-grupo-4 \
   --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(gen)}" \
