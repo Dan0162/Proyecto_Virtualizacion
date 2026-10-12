@@ -4,6 +4,7 @@ metadata:
   name: postgres-service
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: postgres-db
   ports:
@@ -18,6 +19,7 @@ metadata:
   name: frontend
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: frontend
   ports:
@@ -32,6 +34,7 @@ metadata:
   name: catalogo
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: catalogo
   ports:
@@ -46,6 +49,7 @@ metadata:
   name: clientes
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: clientes
   ports:
@@ -60,6 +64,7 @@ metadata:
   name: inventario
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: inventario
   ports:
@@ -74,6 +79,7 @@ metadata:
   name: pedidos
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: pedidos
   ports:
@@ -88,6 +94,7 @@ metadata:
   name: reportes
   namespace: proyecto-2-powerrangers
 spec:
+  type: ClusterIP
   selector:
     app: reportes
   ports:

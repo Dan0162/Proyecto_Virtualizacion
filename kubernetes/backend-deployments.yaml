@@ -221,8 +221,17 @@ spec:
               key: REPORTES_DB_PASSWORD
         # URLs de comunicación interna
         - name: CATALOGO_URL
-          value: "http://catalogo:5000"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CATALOGO_URL
         - name: INVENTARIO_URL
-          value: "http://inventario:5000"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: INVENTARIO_URL
         - name: PEDIDOS_URL
-          value: "http://pedidos:5000"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PEDIDOS_URL
