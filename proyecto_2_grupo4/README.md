@@ -25,7 +25,7 @@ sufijo `-grupo-4` y la etiqueta `equipo: grupo-4`.
 ## Arquitectura
 
 ```
-navegador -> Service LoadBalancer :80 / NodePort :30080
+navegador -> Service LoadBalancer :8080 / NodePort :30080
           -> Deployment gateway (nginx + ConfigMap)
                /            -> Service frontend-grupo-4 (2 réplicas)
                /api/<svc>/  -> Service <svc>-grupo-4 (catalogo inventario clientes pedidos reportes)
@@ -72,7 +72,7 @@ Cada captura debe mostrar el reloj del sistema y el carné.
 | 8 | Escalado declarativo | editar `replicas` en `05-backends.yaml` o `06-frontend.yaml` y `kubectl apply -f ...` (no `kubectl scale`) |
 | 9 | Autoreparación | `kubectl delete pod <pod-frontend> -n proyecto-2-grupo-4` y `kubectl get pods -w` |
 | 10 | ClusterIP con endpoints | `kubectl get svc -n proyecto-2-grupo-4` y `kubectl get endpoints catalogo-grupo-4 -n proyecto-2-grupo-4` |
-| 11 | NodePort y LoadBalancer | `kubectl get svc -n proyecto-2-grupo-4` y abrir `http://<IP-VM>:30080` y `http://<IP-VM>/` (respaldo: `kubectl port-forward svc/gateway-lb-grupo-4 8080:80 -n proyecto-2-grupo-4`) |
+| 11 | NodePort y LoadBalancer | `kubectl get svc -n proyecto-2-grupo-4` y abrir `http://<IP-VM>:30080` y `http://<IP-VM>:8080/` (respaldo: `kubectl port-forward svc/gateway-lb-grupo-4 8080:80 -n proyecto-2-grupo-4`) |
 | 12 | Rutas del gateway | `kubectl get cm gateway-conf-grupo-4 -n proyecto-2-grupo-4 -o yaml` |
 | 13 | CRUD en el navegador | crear editar y eliminar un producto en Inventario y crear un pedido en Pedidos |
 
@@ -84,6 +84,8 @@ Cada captura debe mostrar el reloj del sistema y el carné.
   subdirectorio del volumen.
 - Si un Service no responde y `get endpoints` sale vacío, revisar que el `selector` coincida con
   los labels del Pod.
-- La VM tiene 1 CPU y 1.6 GB de RAM, así que el arranque inicial de k3s y los Pods es lento.
+- La VM original (1 CPU y 2 GB) no soportaba k3s con 9 Pods: el API server daba timeout. Se subió a 4 CPU y 4 GB.
+- El LoadBalancer usa el puerto 8080 porque Traefik (incluido en k3s) ya ocupa el 80 de la VM.
+- Los Services NodePort y LoadBalancer del gateway se aplican con `kubectl apply -f 07-gateway.yaml`; verificar con `kubectl get svc` que existan.
 - Las imágenes locales se cargan en k3s con `docker save | sudo k3s ctr images import -` cuando
   no se usa Docker Hub.
