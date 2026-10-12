@@ -23,6 +23,23 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           env:
             - name: DB_HOST
               valueFrom:
@@ -91,6 +108,23 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           env:
             - name: DB_HOST
               valueFrom:
@@ -159,6 +193,23 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           env:
             - name: DB_HOST
               valueFrom:
@@ -227,6 +278,23 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           env:
             - name: DB_HOST
               valueFrom:
@@ -253,6 +321,11 @@ spec:
                 secretKeyRef:
                   name: db-credentials-grupo-4
                   key: PEDIDOS_DB_PASSWORD
+            - name: CATALOGO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CATALOGO_URL
             - name: INVENTARIO_URL
               valueFrom:
                 configMapKeyRef:
@@ -300,6 +373,23 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           env:
             - name: DB_HOST
               valueFrom:
