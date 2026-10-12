@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-data-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    equipo: grupo-4
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: db
+    equipo: grupo-4
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: PG_SUPERUSER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: POSTGRES_PASSWORD
+            - name: CATALOGO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: CATALOGO_DB_PASSWORD
+            - name: INVENTARIO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: INVENTARIO_DB_PASSWORD
+            - name: CLIENTES_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: CLIENTES_DB_PASSWORD
+            - name: PEDIDOS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: PEDIDOS_DB_PASSWORD
+            - name: REPORTES_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: REPORTES_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: db-data-grupo-4
+        - name: init
+          configMap:
+            name: db-init-grupo-4
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: db
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: db
+  ports:
+    - port: 5432
+      targetPort: 5432

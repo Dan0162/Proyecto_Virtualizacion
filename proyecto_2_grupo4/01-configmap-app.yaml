@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    equipo: grupo-4
+data:
+  PG_SUPERUSER: "postgres"
+  DB_HOST: "db-grupo-4"
+  DB_PORT: "5432"
+  CATALOGO_DB_NAME: "catalogo_db"
+  CATALOGO_DB_USER: "catalogo_user"
+  INVENTARIO_DB_NAME: "inventario_db"
+  INVENTARIO_DB_USER: "inventario_user"
+  CLIENTES_DB_NAME: "clientes_db"
+  CLIENTES_DB_USER: "clientes_user"
+  PEDIDOS_DB_NAME: "pedidos_db"
+  PEDIDOS_DB_USER: "pedidos_user"
+  REPORTES_DB_NAME: "reportes_db"
+  REPORTES_DB_USER: "reportes_user"
+  CATALOGO_URL: "http://catalogo-grupo-4:5000"
+  INVENTARIO_URL: "http://inventario-grupo-4:5000"
+  PEDIDOS_URL: "http://pedidos-grupo-4:5000"

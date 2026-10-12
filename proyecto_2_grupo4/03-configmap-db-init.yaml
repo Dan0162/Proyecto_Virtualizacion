@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    equipo: grupo-4
+data:
+  00-databases.sh: |
+    #!/bin/bash
+    # Área 4 (Datos): crea un rol y una base de datos independiente por microservicio.
+    # Se ejecuta una sola vez, la primera vez que arranca el contenedor con el volumen
+    # db_data vacío (comportamiento estándar de la imagen postgres). Para volver a
+    # correrlo en desarrollo: docker compose down -v (borra el volumen) y docker
+    # compose up de nuevo.
+    #
+    # Las contraseñas llegan por variables de entorno del contenedor "db" (ver
+    # environment en docker-compose.yml), que a su vez las toma del archivo .env
+    # en la raíz del proyecto (ver .env.example). Cero contraseñas quemadas aquí.
+    set -euo pipefail
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        CREATE ROLE catalogo_user   WITH LOGIN PASSWORD '$CATALOGO_DB_PASSWORD';
+        CREATE ROLE inventario_user WITH LOGIN PASSWORD '$INVENTARIO_DB_PASSWORD';
+        CREATE ROLE clientes_user   WITH LOGIN PASSWORD '$CLIENTES_DB_PASSWORD';
+        CREATE ROLE pedidos_user    WITH LOGIN PASSWORD '$PEDIDOS_DB_PASSWORD';
+        CREATE ROLE reportes_user   WITH LOGIN PASSWORD '$REPORTES_DB_PASSWORD';
+
+        CREATE DATABASE catalogo_db   OWNER catalogo_user;
+        CREATE DATABASE inventario_db OWNER inventario_user;
+        CREATE DATABASE clientes_db   OWNER clientes_user;
+        CREATE DATABASE pedidos_db    OWNER pedidos_user;
+        CREATE DATABASE reportes_db   OWNER reportes_user;
+
+        -- Postgres otorga CONNECT sobre toda base de datos nueva a PUBLIC por
+        -- defecto: cualquier rol podría conectarse a la base de otro servicio
+        -- (aunque no leer sus tablas). Se revoca para que cada base sea alcanzable
+        -- únicamente por su propio usuario, como pide el enunciado.
+        REVOKE CONNECT ON DATABASE catalogo_db   FROM PUBLIC;
+        REVOKE CONNECT ON DATABASE inventario_db FROM PUBLIC;
+        REVOKE CONNECT ON DATABASE clientes_db   FROM PUBLIC;
+        REVOKE CONNECT ON DATABASE pedidos_db    FROM PUBLIC;
+        REVOKE CONNECT ON DATABASE reportes_db   FROM PUBLIC;
+
+        GRANT CONNECT ON DATABASE catalogo_db   TO catalogo_user;
+        GRANT CONNECT ON DATABASE inventario_db TO inventario_user;
+        GRANT CONNECT ON DATABASE clientes_db   TO clientes_user;
+        GRANT CONNECT ON DATABASE pedidos_db    TO pedidos_user;
+        GRANT CONNECT ON DATABASE reportes_db   TO reportes_user;
+
+        -- Reportes consulta APIs internas y solo posee acceso a reportes_db.
+    EOSQL
+  01-catalogo.sql: |
+    -- Área 4 (Datos) — esquema y seed de catalogo_db (microservicio "catalogo").
+    -- Datos maestros de producto: SKU, nombre, categoría, precio en Q.
+    -- El stock (cantidades) vive en inventario_db, no aquí.
+    \connect catalogo_db
+
+    SET ROLE catalogo_user;
+
+    CREATE TABLE productos (
+        id        SERIAL PRIMARY KEY,
+        sku       VARCHAR(30)  NOT NULL UNIQUE,
+        nombre    VARCHAR(120) NOT NULL,
+        categoria VARCHAR(60)  NOT NULL,
+        precio_q  NUMERIC(10,2) NOT NULL CHECK (precio_q >= 0),
+        creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    INSERT INTO productos (sku, nombre, categoria, precio_q) VALUES
+        ('QT-0001', 'Café tostado 1lb',        'Abarrotes', 45.00),
+        ('QT-0002', 'Azúcar blanca 5lb',       'Abarrotes', 32.50),
+        ('QT-0003', 'Aceite vegetal 1L',       'Abarrotes', 28.00),
+        ('QT-0004', 'Detergente en polvo 2kg', 'Limpieza',  55.75),
+        ('QT-0005', 'Papel higiénico x12',     'Limpieza',  39.90),
+        ('QT-0006', 'Jabón de tocador x3',     'Higiene',   18.25),
+        ('QT-0007', 'Arroz 5lb',               'Abarrotes', 30.00),
+        ('QT-0008', 'Frijol negro 5lb',        'Abarrotes', 34.50);
+
+    RESET ROLE;
+  02-inventario.sql: |
+    -- Área 4 (Datos) — esquema y seed de inventario_db (microservicio "inventario").
+    -- Cantidades en existencia por SKU. El SKU referencia lógicamente a
+    -- catalogo_db.productos.sku (no hay FK real: son bases de datos distintas).
+    \connect inventario_db
+
+    SET ROLE inventario_user;
+
+    CREATE TABLE stock (
+        id             SERIAL PRIMARY KEY,
+        sku            VARCHAR(30) NOT NULL UNIQUE,
+        cantidad       INTEGER NOT NULL CHECK (cantidad >= 0),
+        stock_minimo   INTEGER NOT NULL DEFAULT 10 CHECK (stock_minimo >= 0),
+        actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    -- QT-0002 y QT-0005 quedan a propósito por debajo de su stock_minimo,
+    -- para poder demostrar la alerta de stock bajo del dashboard.
+    INSERT INTO stock (sku, cantidad, stock_minimo) VALUES
+        ('QT-0001', 120, 20),
+        ('QT-0002',   8, 15),
+        ('QT-0003',  60, 15),
+        ('QT-0004',  45, 10),
+        ('QT-0005',   5, 20),
+        ('QT-0006', 200, 30),
+        ('QT-0007',  90, 20),
+        ('QT-0008',  75, 20);
+
+    RESET ROLE;
+  03-clientes.sql: |
+    -- Área 4 (Datos) — esquema y seed de clientes_db (microservicio "clientes").
+    \connect clientes_db
+
+    SET ROLE clientes_user;
+
+    CREATE TABLE clientes (
+        id        SERIAL PRIMARY KEY,
+        nombre    VARCHAR(120) NOT NULL,
+        nit       VARCHAR(20) UNIQUE,
+        telefono  VARCHAR(20),
+        email     VARCHAR(120),
+        direccion VARCHAR(200),
+        creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    INSERT INTO clientes (nombre, nit, telefono, email, direccion) VALUES
+        ('Tienda La Esquina',        '1234567-8', '5555-1111', 'contacto@laesquina.gt', 'Zona 1, Ciudad de Guatemala'),
+        ('Supermercado San Rafael',  '2345678-9', '5555-2222', 'ventas@sanrafael.gt',   'Zona 5, Ciudad de Guatemala'),
+        ('Distribuidora Norte',      '3456789-0', '5555-3333', 'info@distnorte.gt',     'Cobán, Alta Verapaz'),
+        ('Minimarket El Ahorro',     '4567890-1', '5555-4444', 'compras@elahorro.gt',   'Quetzaltenango'),
+        ('Abarrotería Don Chepe',    '5678901-2', '5555-5555', 'donchepe@gmail.com',    'Escuintla');
+
+    RESET ROLE;
+  04-pedidos.sql: |
+    -- Área 4 (Datos) — esquema y seed de pedidos_db (microservicio "pedidos").
+    --
+    -- "integrantes" es la tabla de evidencia personalizada: los carnés del
+    -- equipo, referenciados por cada pedido (FK). El backend (Área 5) debe
+    -- insertar el carné real del integrante que crea el pedido al confirmarlo.
+    --
+    -- cliente_id y detalle_pedido.sku son referencias lógicas a clientes_db y
+    -- catalogo_db respectivamente (no hay FK real entre bases de datos distintas).
+    \connect pedidos_db
+
+    SET ROLE pedidos_user;
+
+    CREATE TABLE integrantes (
+        carne  VARCHAR(15) PRIMARY KEY,
+        nombre VARCHAR(120)
+    );
+
+    INSERT INTO integrantes (carne, nombre) VALUES
+        ('1040023', 'Daniel Diaz'),
+        ('1053223', 'Jose Enríquez'),
+        ('1199923', 'Hector Flores'),
+        ('1280423', 'Joaquín Choc'),
+        ('333123',  'Sofia Sigüenza');
+
+    CREATE TABLE pedidos (
+        id               SERIAL PRIMARY KEY,
+        cliente_id       INTEGER,
+        carne_integrante VARCHAR(15) NOT NULL REFERENCES integrantes(carne),
+        estado           VARCHAR(20) NOT NULL DEFAULT 'confirmado'
+                             CHECK (estado IN ('pendiente', 'confirmado', 'cancelado')),
+        creado_en        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE detalle_pedido (
+        id                SERIAL PRIMARY KEY,
+        pedido_id         INTEGER NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+        sku               VARCHAR(30) NOT NULL,
+        cantidad          INTEGER NOT NULL CHECK (cantidad > 0),
+        precio_unitario_q NUMERIC(10,2) NOT NULL CHECK (precio_unitario_q >= 0)
+    );
+
+    -- Un pedido de ejemplo por cada carné del equipo, como evidencia sembrada.
+    INSERT INTO pedidos (cliente_id, carne_integrante, estado) VALUES
+        (1, '1040023', 'confirmado'),
+        (2, '1053223', 'confirmado'),
+        (3, '1199923', 'confirmado'),
+        (4, '1280423', 'confirmado'),
+        (5, '333123',  'confirmado');
+
+    INSERT INTO detalle_pedido (pedido_id, sku, cantidad, precio_unitario_q) VALUES
+        (1, 'QT-0001', 2, 45.00),
+        (1, 'QT-0003', 1, 28.00),
+        (2, 'QT-0002', 3, 32.50),
+        (3, 'QT-0004', 1, 55.75),
+        (3, 'QT-0005', 2, 39.90),
+        (4, 'QT-0006', 5, 18.25),
+        (5, 'QT-0007', 4, 30.00);
+
+    RESET ROLE;
+  05-reportes.sql: |
+    -- Área 4 (Datos) — reportes_db (microservicio "reportes").
+    --
+    -- El rol y la base ya se crean en 00-databases.sh. No se define esquema aquí
+    -- a propósito: el enunciado dice que Backend de dominio (Área 5) resuelve
+    -- la lógica de reportes por cuenta propia (agregando datos de catalogo,
+    -- inventario y pedidos vía sus APIs). 
+    --
+    --   \connect reportes_db
+    --   SET ROLE reportes_user;
+    --   CREATE TABLE ...;
+    --   RESET ROLE;
