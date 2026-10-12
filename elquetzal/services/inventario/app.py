@@ -179,7 +179,8 @@ def get_stock():
 
         return jsonify(stock=[serializar_stock(registro) for registro in registros]), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.post("/stock")
 def crear_stock():
@@ -220,7 +221,8 @@ def crear_stock():
     except psycopg.errors.UniqueViolation:
         return jsonify(error="Ya existe stock para ese SKU"), 400
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.get("/stock/<sku>")
 def get_stock_por_sku(sku):
@@ -247,7 +249,8 @@ def get_stock_por_sku(sku):
             return jsonify(error="Stock no encontrado"), 404
         return jsonify(stock=serializar_stock(registro)), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.put("/stock/<sku>")
 def actualizar_stock(sku):
@@ -304,7 +307,8 @@ def actualizar_stock(sku):
             return jsonify(error="Stock no encontrado"), 404
         return jsonify(stock=serializar_stock(registro)), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.delete("/stock/<sku>")
 def eliminar_stock(sku):
@@ -331,7 +335,8 @@ def eliminar_stock(sku):
             return jsonify(error="Stock no encontrado"), 404
         return jsonify(mensaje="Stock eliminado correctamente", sku=registro[0]), 201
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 # Solo sirve para debug fuera del contenedor, el servicio lo arranca gunicorn
 if __name__ == "__main__":
