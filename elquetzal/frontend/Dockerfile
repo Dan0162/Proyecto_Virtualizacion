@@ -1,13 +1,17 @@
-# Etapa 1 Construcción del frontend
-FROM node:20-alpine AS build 
+# Etapa 1: construcción del frontend
+FROM node:22-alpine AS build
+
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci
+
 COPY . .
 RUN npm run build
 
-# Etapa 2 Sirviendo el frontend
-FROM nginx:1.27-alpine
+# Etapa 2: servidor web
+FROM nginx:1.30-alpine
+
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
