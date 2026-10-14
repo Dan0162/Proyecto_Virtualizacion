@@ -1,0 +1,18 @@
+# Plantilla del Secret. NO contiene contrasenas reales.
+# El archivo real se llama secret.yaml, queda solo en la maquina (esta en .gitignore)
+# y se genera con scripts/generate-secret.sh.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    equipo: grupo-4
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: CAMBIAR
+  CATALOGO_DB_PASSWORD: CAMBIAR
+  INVENTARIO_DB_PASSWORD: CAMBIAR
+  CLIENTES_DB_PASSWORD: CAMBIAR
+  PEDIDOS_DB_PASSWORD: CAMBIAR
+  REPORTES_DB_PASSWORD: CAMBIAR
