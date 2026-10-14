@@ -99,7 +99,8 @@ def get_clientes():
 
         return jsonify(clientes=[serializar_cliente(cliente) for cliente in clientes]), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.post("/")
 def crear_cliente():
@@ -141,7 +142,8 @@ def crear_cliente():
     except psycopg.errors.UniqueViolation:
         return jsonify(error="Ya existe un cliente con ese NIT"), 400
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.get("/<int:id>")
 def get_cliente_por_id(id):
@@ -164,7 +166,8 @@ def get_cliente_por_id(id):
             return jsonify(error="Cliente no encontrado"), 404
         return jsonify(cliente=serializar_cliente(cliente)), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.put("/<int:id>")
 def actualizar_cliente(id):
@@ -215,7 +218,8 @@ def actualizar_cliente(id):
     except psycopg.errors.UniqueViolation:
         return jsonify(error="Ya existe un cliente con ese NIT"), 400
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 @app.delete("/<int:id>")
 def eliminar_cliente(id):
@@ -238,7 +242,5 @@ def eliminar_cliente(id):
             return jsonify(error="Cliente no encontrado"), 404
         return jsonify(mensaje="Cliente eliminado correctamente"), 201
     except Exception as error:
-        return jsonify(error=str(error)), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500

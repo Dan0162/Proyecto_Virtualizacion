@@ -3,4 +3,6 @@
 elquetzal/.env
 elquetzal/services/*/.env
 elquetzal/services/*/__pycache__/
-kubernetes/secrets.yaml
+# Proyecto 2: nunca subir secretos
+proyecto_2_grupo4/**/secret*.yaml
+proyecto_2_grupo4/*.secret

@@ -1,16 +1,16 @@
 import json
-import math
 import os
+import urllib.parse
 import urllib.request
 from urllib.error import HTTPError, URLError
-from decimal import Decimal, InvalidOperation
+from datetime import date
+from decimal import Decimal
 
 import psycopg
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 SERVICE_NAME = "pedidos"
-ESTADOS_VALIDOS = {"pendiente", "confirmado", "cancelado"}
 
 
 @app.get("/health")
@@ -58,9 +58,9 @@ def validar_pedido(datos):
     ):
         return None, "cliente_id debe ser un entero positivo"
 
-    estado = datos.get("estado", "pendiente")
-    if not isinstance(estado, str) or estado not in ESTADOS_VALIDOS:
-        return None, "estado debe ser pendiente, confirmado o cancelado"
+    estado = datos.get("estado", "confirmado")
+    if estado != "confirmado":
+        return None, "solo se pueden crear pedidos con estado confirmado"
 
     if "detalles" not in datos:
         return None, "Falta el campo requerido: detalles"
@@ -93,7 +93,7 @@ def validar_detalle(detalle):
     if campos_desconocidos:
         return None, f"campos no permitidos: {', '.join(sorted(campos_desconocidos))}"
 
-    campos_faltantes = campos_permitidos - detalle.keys()
+    campos_faltantes = {"sku", "cantidad"} - detalle.keys()
     if campos_faltantes:
         return None, f"faltan campos: {', '.join(sorted(campos_faltantes))}"
 
@@ -107,17 +107,8 @@ def validar_detalle(detalle):
     if isinstance(cantidad, bool) or not isinstance(cantidad, int) or cantidad <= 0:
         return None, "cantidad debe ser un entero positivo"
 
-    precio = detalle["precio_unitario_q"]
-    if isinstance(precio, bool) or not isinstance(precio, (int, float)):
-        return None, "precio_unitario_q debe ser un numero"
-    if isinstance(precio, float) and not math.isfinite(precio):
-        return None, "precio_unitario_q debe ser finito"
-    try:
-        precio_decimal = Decimal(str(precio))
-    except (InvalidOperation, ValueError):
-        return None, "precio_unitario_q debe ser un numero valido"
-    if precio_decimal < 0 or precio_decimal > Decimal("99999999.99"):
-        return None, "precio_unitario_q esta fuera del rango permitido"
+    # El precio real lo toma pedidos del catalogo; el del cliente se ignora.
+    precio_decimal = Decimal("0")
 
     return {
         "sku": sku.strip(),
@@ -179,7 +170,29 @@ def get_pedidos():
                 filas = cur.fetchall()
         return jsonify(pedidos=serializar_pedidos(filas)), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
+
+
+@app.get("/conteo")
+def contar_pedidos():
+    """Cuenta los pedidos del dia dado (YYYY-MM-DD) en hora de Guatemala."""
+    try:
+        fecha = date.fromisoformat(request.args.get("fecha", ""))
+    except ValueError:
+        return jsonify(error="fecha debe tener el formato YYYY-MM-DD"), 400
+    try:
+        with connect_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT count(*) FROM pedidos "
+                    "WHERE (creado_en AT TIME ZONE 'America/Guatemala')::date = %s",
+                    (fecha,),
+                )
+                return jsonify(fecha=fecha.isoformat(), total=cur.fetchone()[0]), 200
+    except Exception:
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 
 @app.get("/<int:id>")
@@ -202,7 +215,8 @@ def get_pedido_por_id(id):
             return jsonify(error="Pedido no encontrado"), 404
         return jsonify(pedido=serializar_pedidos(filas)[0]), 200
     except Exception as error:
-        return jsonify(error=str(error)), 500
+        app.logger.exception("Error interno")
+        return jsonify(error="Error interno del servidor"), 500
 
 
 @app.post("/")
@@ -246,6 +260,23 @@ def crear_pedido():
     except Exception:
         app.logger.exception("No se pudo validar el carné")
         return jsonify(error="No se pudo validar el carné"), 500
+
+    # El precio sale del catalogo; el precio que manda el cliente se ignora.
+    catalogo_url = os.getenv("CATALOGO_URL", "http://catalogo:5000").rstrip("/")
+    for detalle in campos["detalles"]:
+        try:
+            with urllib.request.urlopen(
+                f"{catalogo_url}/productos/{urllib.parse.quote(detalle['sku'], safe='')}", timeout=10
+            ) as response:
+                detalle["precio_unitario_q"] = Decimal(str(json.load(response)["producto"]["precio_q"]))
+        except HTTPError as error:
+            if error.code == 404:
+                return jsonify(error=f"SKU no existe en el catalogo: {detalle['sku']}"), 422
+            app.logger.exception("Catalogo no pudo responder")
+            return jsonify(error="No se pudo consultar el catalogo"), 502
+        except (URLError, TimeoutError, ValueError, KeyError):
+            app.logger.exception("No se pudo contactar catalogo")
+            return jsonify(error="No se pudo consultar el catalogo"), 503
 
     # Inventario valida y descuenta todos los SKU bajo bloqueos en una transaccion.
     cantidades = [
@@ -321,8 +352,9 @@ def crear_pedido():
         if isinstance(error, psycopg.errors.ForeignKeyViolation):
             return jsonify(error="carne_integrante no existe en integrantes"), 400
         if isinstance(error, psycopg.errors.IntegrityError):
-            return jsonify(error=str(error)), 400
+            return jsonify(error="Pedido invalido: viola una restriccion de datos"), 400
         return jsonify(error="Pedido no guardado; inventario reintegrado"), 500
+    
 @app.patch("/<int:id>/estado")
 def actualizar_estado(id):
     """Actualiza el estado de un pedido y reintegra el inventario si es cancelado."""

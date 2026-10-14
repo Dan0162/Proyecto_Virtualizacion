@@ -1,0 +1,444 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogo-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: catalogo
+    equipo: grupo-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalogo
+  template:
+    metadata:
+      labels:
+        app: catalogo
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: catalogo
+          image: docker.io/ishaimaster/elquetzal-catalogo:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CATALOGO_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CATALOGO_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: CATALOGO_DB_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalogo-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: catalogo
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: catalogo
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventario-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: inventario
+    equipo: grupo-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventario
+  template:
+    metadata:
+      labels:
+        app: inventario
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: inventario
+          image: docker.io/ishaimaster/elquetzal-inventario:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: INVENTARIO_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: INVENTARIO_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: INVENTARIO_DB_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventario-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: inventario
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: inventario
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clientes-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: clientes
+    equipo: grupo-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clientes
+  template:
+    metadata:
+      labels:
+        app: clientes
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: clientes
+          image: docker.io/ishaimaster/elquetzal-clientes:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CLIENTES_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CLIENTES_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: CLIENTES_DB_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clientes-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: clientes
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: clientes
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pedidos-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: pedidos
+    equipo: grupo-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pedidos
+  template:
+    metadata:
+      labels:
+        app: pedidos
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: pedidos
+          image: docker.io/ishaimaster/elquetzal-pedidos:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: PEDIDOS_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: PEDIDOS_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: PEDIDOS_DB_PASSWORD
+            - name: CATALOGO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CATALOGO_URL
+            - name: INVENTARIO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: INVENTARIO_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pedidos-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: pedidos
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: pedidos
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reportes-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: reportes
+    equipo: grupo-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reportes
+  template:
+    metadata:
+      labels:
+        app: reportes
+        equipo: grupo-4
+    spec:
+      containers:
+        - name: reportes
+          image: docker.io/ishaimaster/elquetzal-reportes:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: REPORTES_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: REPORTES_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials-grupo-4
+                  key: REPORTES_DB_PASSWORD
+            - name: CATALOGO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: CATALOGO_URL
+            - name: INVENTARIO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: INVENTARIO_URL
+            - name: PEDIDOS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-grupo-4
+                  key: PEDIDOS_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reportes-grupo-4
+  namespace: proyecto-2-grupo-4
+  labels:
+    app: reportes
+    equipo: grupo-4
+spec:
+  type: ClusterIP
+  selector:
+    app: reportes
+  ports:
+    - port: 5000
+      targetPort: 5000

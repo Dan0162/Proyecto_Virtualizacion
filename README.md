@@ -232,7 +232,7 @@ Todos los endpoints están prefijados por el API Gateway. La base de la URL asum
 ### 5. Reportes (`/api/reportes`)
 
 * **GET `/`**
-  * **Descripción:** Devuelve un reporte consolidado. Consulta de forma paralela las bases de datos de Catálogo, Inventario y Pedidos para entregar una radiografía financiera y de stock del negocio en un momento dado.
+  * **Descripción:** Devuelve un reporte consolidado. Consulta de forma paralela las APIs de Catálogo, Inventario y Pedidos para entregar una radiografía financiera y de stock del negocio en un momento dado.
   * **Query Params (Opcional):** `?fecha=YYYY-MM-DD` (Para ver los pedidos de un día específico. Por defecto usa el día actual).
   * **Respuesta Esperada:**
     ```json
