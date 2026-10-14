@@ -16,7 +16,7 @@ sufijo `-grupo-4` y la etiqueta `equipo: grupo-4`.
 | Contenedores | Deployments (Pod gestionado por ReplicaSet) | `04-db.yaml` `05-backends.yaml` `06-frontend.yaml` `07-gateway.yaml` |
 | Volumen `db_data` | PersistentVolumeClaim `db-data-grupo-4` (local-path) | `04-db.yaml` |
 | `.env` (no sensible) | ConfigMap `app-config-grupo-4` | `01-configmap-app.yaml` |
-| `.env` (contraseñas) | Secret `db-credentials-grupo-4` | creado con `scripts/create-secret.sh` (no está en el repo) |
+| `.env` (contraseñas) | Secret `db-credentials-grupo-4` | `secret.yaml` local, generado con `scripts/generate-secret.sh` (ignorado por git; plantilla en `plantilla-credenciales.yaml`) |
 | Scripts `bd/init` | ConfigMap `db-init-grupo-4` montado en `/docker-entrypoint-initdb.d` | `03-configmap-db-init.yaml` |
 | `nginx.conf` del gateway | ConfigMap `gateway-conf-grupo-4` | `02-configmap-gateway.yaml` |
 | Red `internal` y puertos | Services ClusterIP / NodePort / LoadBalancer | en cada archivo |
@@ -53,8 +53,9 @@ kubectl get all -n proyecto-2-grupo-4
 kubectl get endpoints -n proyecto-2-grupo-4
 ```
 
-El Secret nunca se guarda en el repositorio: `create-secret.sh` lo crea directamente en el
-cluster con contraseñas generadas al azar (o tomadas de variables de entorno).
+El Secret nunca se sube al repositorio: `generate-secret.sh` crea `secret.yaml` local con contraseñas
+aleatorias (si ya existe lo conserva) y `deploy.sh` lo aplica con `kubectl apply -f secret.yaml`.
+Si la base ya fue inicializada, `secret.yaml` debe conservar las mismas contraseñas.
 
 ## Evidencia por criterio de la lista de cotejo
 
